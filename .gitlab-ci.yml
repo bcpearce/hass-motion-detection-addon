@@ -1,0 +1,35 @@
+stages:
+  - configure
+  - build
+
+variables:
+  VCPKG_DEFAULT_BINARY_CACHE: $CI_PROJECT_DIR/.cache/vcpkg-binary-cache
+
+default:
+  image: gitlab-registry.bcpearce.com/bcpearce/cpp-tools:latest
+  before_script:
+    - mkdir -p $VCPKG_DEFAULT_BINARY_CACHE
+
+cmake-configure:
+  stage: configure
+  script:
+    - mkdir build && cd build
+    - cmake .. --preset=vcpkg
+  artifacts:
+    paths:
+      - build/
+    when: on_success
+    expire_in: "1 day"
+  cache:
+    - key: cache-vcpkg
+      paths:
+        - .cache/vcpkg-binary-cache
+
+cmake-build:
+  stage: build
+  script:
+    - cd build
+    - cmake --build .
+  artifacts:
+    paths:
+      - build/MotionDetection
