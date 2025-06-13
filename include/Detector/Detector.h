@@ -2,6 +2,7 @@
 #define INCLUDE_DETECTOR_H
 
 #include <span>
+#include <variant>
 #include <vector>
 
 #include <opencv2/core.hpp>

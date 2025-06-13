@@ -85,10 +85,25 @@ docker:register:release:
     - docker:register
   script:
     - docker pull $CONTAINER_RUN_IMAGE
-    - docker tag $CONTAINER_RUN_IMAGE $CONTAINER_RELEASE_IMAGE $CONTAINER_TAG_IMAGE
-    - docker tag $CONTAINER_RUN_IMAGE $DOCKER_HUB_USER/hass-motion-detection-addon:latest $DOCKER_HUB_USER/hass-motion-detection-addon:$CI_COMMIT_TAG
+    - docker tag $CONTAINER_RUN_IMAGE $CONTAINER_RELEASE_IMAGE
+    - docker tag $CONTAINER_RUN_IMAGE $DOCKER_HUB_USER/hass-motion-detection-addon:latest
     - docker push $CONTAINER_RELEASE_IMAGE
+    - docker push $DOCKER_HUB_USER/hass-motion-detection-addon:latest
 
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+
+docker:register:tag:
+  stage: release
+  extends: .docker
+  needs:
+    - docker:register
+  script:
+    - docker pull $CONTAINER_RUN_IMAGE
+    - docker tag $CONTAINER_RUN_IMAGE $CONTAINER_TAG_IMAGE
+    - docker tag $CONTAINER_RUN_IMAGE $DOCKER_HUB_USER/hass-motion-detection-addon:$CI_COMMIT_TAG
+    - docker push $CONTAINER_RELEASE_IMAGE
+    - docker push $DOCKER_HUB_USER/hass-motion-detection-addon:$CI_COMMIT_TAG
+
+  rules:
     - if: $CI_COMMIT_TAG
