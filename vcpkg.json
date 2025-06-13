@@ -1,7 +1,36 @@
 {
-    "dependencies": [
-        "curl",
-        "opencv",
-        "openssl"
-    ]
+  "dependencies": [
+    "boost-program-options",
+    "boost-url",
+    "curl",
+    "live555",
+    {
+      "name": "opencv4",
+      "features": [
+        "contrib"
+      ]
+    },
+    "openh264",
+    "openssl",
+    "nlohmann-json"
+  ],
+  "features": {
+    "graphical-user-interface": {
+      "dependencies": [
+        {
+          "name": "opencv4",
+          "features": [
+            "highgui"
+          ]
+        }
+      ],
+      "description": "Show a graphical user interface while running."
+    },
+    "tests": {
+      "dependencies": [
+        "gtest"
+      ],
+      "description": "Build tests."
+    }
+  }
 }

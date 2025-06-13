@@ -1,13 +1,30 @@
 {
-    "version": 10,
-    "configurePresets": [
-        {
-            "name": "vcpkg",
-            "hidden": true,
-            "generator": "Ninja",
-            "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-            }
-        }
-    ]
+  "configurePresets": [
+    {
+      "name": "vcpkg",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTS": true,
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_INSTALL_OPTIONS": "--clean-buildtrees-after-build;--clean-packages-after-build"
+      },
+      "generator": "Ninja",
+      "hidden": true
+    },
+    {
+      "name": "Release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
+      },
+      "inherits": "vcpkg"
+    },
+    {
+      "name": "Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "inherits": "vcpkg"
+    }
+  ],
+  "version": 8
 }

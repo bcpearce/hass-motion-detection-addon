@@ -1,24 +1,197 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.30)
 
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-project(MotionDetection)
+add_compile_definitions(
+    $<$<CONFIG:Debug>:_DEBUG>
+)
 
+set(OPENCV_MODULES "core;bgsegm;imgproc")
+
+option(USE_GRAPHICAL_USER_INTERFACE "Enable GUI backed by OpenCV's highgui module" OFF)
+if (USE_GRAPHICAL_USER_INTERFACE)
+  message(STATUS "Building with graphical user interface.")
+  list(APPEND VCPKG_MANIFEST_FEATURES "graphical-user-interface")
+  list(APPEND OPENCV_MODULES "highgui")
+  add_compile_definitions(USE_GRAPHICAL_USER_INTERFACE=1)
+endif()
+
+option(BUILD_TESTS "Build Tests" ON)
+if (BUILD_TESTS)
+  list(APPEND VCPKG_MANIFEST_FEATURES "tests")
+endif()
+
+if(WIN32)
+    add_compile_definitions("_WIN32_WINNT=0x0601") # Windows 7
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
+if (MSVC)
+    add_compile_options("/external:W0 /external:anglebrackets")
+endif()
+
+project(MotionDetection
+    DESCRIPTION "Motion detection for video feeds"
+    VERSION "0.1.0"
+)
+add_compile_definitions(MOTION_DETECTION_SEMVER="${PROJECT_VERSION}")
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+find_package(Boost REQUIRED COMPONENTS
+  program_options
+  url
+)
 find_package(CURL REQUIRED)
-find_package(OpenCV REQUIRED core highgui imgproc video)
+find_package(Live555 CONFIG REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
+find_package(OpenCV REQUIRED COMPONENTS
+  ${OPENCV_MODULES}
+)
 find_package(OpenSSL CONFIG REQUIRED)
+find_package(OpenH264 REQUIRED)
 
-add_executable(MotionDetection main.cpp)
 
-target_link_libraries(MotionDetection PUBLIC 
-    OpenSSL::SSL 
-    OpenSSL::Crypto
+add_library(Detector SHARED
+  src/Detector/Detector.cxx
+  src/Detector/MotionDetector.cxx
+  include/Detector/Detector.h
+  include/Detector/MotionDetector.h
+)
+add_library(HomeAssistant SHARED
+  src/HomeAssistant/HassHandler.cxx
+  include/HomeAssistant/HassHandler.h
+)
+add_library(Util SHARED
+  src/Util/CurlWrapper.cxx
+  src/Util/BufferOperations.cxx
+  src/Util/ProgramOptions.cxx
+  include/Util/CurlWrapper.h
+  include/Util/EventHandler.h
+  include/Util/BufferOperations.h
+  include/Util/ProgramOptions.h
+)
+add_library(VideoSource SHARED
+  src/VideoSource/Http.cxx
+  src/VideoSource/Live555.cxx
+  src/VideoSource/VideoSource.cxx
+  include/VideoSource/Http.h
+  include/VideoSource/Live555.h
+  include/VideoSource/VideoSource.h
+)
+
+if (USE_GRAPHICAL_USER_INTERFACE)
+  add_library(Gui SHARED
+    src/Gui/GuiHandler.cxx
+    include/Gui/GuiHandler.h
+  )
+endif()
+
+add_executable(MotionDetection
+    src/main.cxx
+)
+
+if (EXISTS ${CMAKE_SOURCE_DIR}/.env)
+  add_custom_target(MotionDetectionDotEnv
+    ALL DEPENDS ${CMAKE_SOURCE_DIR}/.env)
+  add_custom_command(
+    TARGET MotionDetection POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_SOURCE_DIR}/.env
+    $<TARGET_FILE_DIR:MotionDetection>/.env
+)
+endif()
+
+include_directories(include)
+
+target_link_libraries(Detector PUBLIC
+  opencv_core
+  opencv_imgproc
+  opencv_bgsegm
+)
+target_link_libraries(HomeAssistant PUBLIC
+  Boost::url
+  Detector
+  nlohmann_json::nlohmann_json
+  Util
+)
+target_link_libraries(Util PUBLIC
+  CURL::libcurl
+  Boost::program_options
+  Boost::url
+  OpenSSL::SSL
+  OpenSSL::Crypto
+)
+target_link_libraries(VideoSource PUBLIC
+  Util
+  Boost::url
+  Live555::groupsock
+  Live555::liveMedia
+  Live555::UsageEnvironment
+  Live555::BasicUsageEnvironment
+  ${OPENH264_LIBRARIES}
+  opencv_core
+  opencv_imgproc
+  opencv_imgcodecs
 )
 target_link_libraries(MotionDetection PRIVATE
-    CURL::libcurl
-    opencv_core
-    opencv_highgui
-    opencv_imgproc
-    opencv_video
+  Detector
+  HomeAssistant
+  Util
+  VideoSource
+  opencv_core
+  opencv_imgproc
 )
+if (USE_GRAPHICAL_USER_INTERFACE)
+  target_link_libraries(Gui PUBLIC
+    opencv_highgui
+  )
+  target_link_libraries(MotionDetection PRIVATE
+    Gui
+  )
+endif()
+
+if (WIN32)
+  target_link_libraries(Util PUBLIC ws2_32 mswsock)
+  target_link_libraries(VideoSource PUBLIC ws2_32 mswsock)
+endif()
+
+if(BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
+
+install(TARGETS MotionDetection
+  EXPORT ${PROJECT_NAME}
+  DESTINATION bin
+)
+install(TARGETS Util VideoSource Detector HomeAssistant
+  EXPORT ${PROJECT_NAME}
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib/${PROJECT_NAME}
+)
+if (USE_GRAPHICAL_USER_INTERFACE)
+  install(TARGETS Gui
+    EXPORT ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib/${PROJECT_NAME}
+  )
+endif()
+install(FILES LICENSE DESTINATION share/licenses/${PROJECT_NAME})
+
+option(PACK_PROJECT "Package the project for distribution" ON)
+if (PACK_PROJECT)
+  include(cmake/Pack.cmake)
+endif()
+
+option(BUILD_DOCKERFILE "Build the deployment dockerfile" OFF)
+if (BUILD_DOCKERFILE)
+  message(STATUS "Will build .deb package and Dockerfile for deployment")
+  include(cmake/FindDocker.cmake)
+  add_subdirectory(docker/deploy)
+endif()
