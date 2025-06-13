@@ -3,6 +3,8 @@
 
 #include "Detector/Detector.h"
 
+#include <variant>
+
 #include <opencv2/bgsegm.hpp>
 #include <opencv2/core.hpp>
 
