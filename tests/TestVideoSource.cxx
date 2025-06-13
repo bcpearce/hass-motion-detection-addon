@@ -6,7 +6,7 @@
 #include "VideoSource/Live555.h"
 
 TEST(HttpVideoSourceTests, Smoke) {
-  video_source::HttpVideoSource http("");
+  video_source::HttpVideoSource http("http://example.com/example");
   EXPECT_NO_THROW(http.InitStream());
   EXPECT_NO_THROW(http.StopStream());
 }
