@@ -1,1 +1,8 @@
+.env
 build/**/*
+CMakeUserPresets.json
+*vcpkg_installed*
+out/
+.vs/
+/install
+Testing/
