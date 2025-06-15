@@ -6,16 +6,10 @@
 #include <string>
 
 #include "Detector/Detector.h"
+#include "Gui/Payload.h"
 #include "VideoSource/VideoSource.h"
 
 namespace gui {
-
-struct Payload {
-  detector::RegionsOfInterest rois;
-  video_source::Frame frame;
-  cv::Mat detail;
-  double fps{std::numeric_limits<double>::quiet_NaN()};
-};
 
 class GuiHandler {
 

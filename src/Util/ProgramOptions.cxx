@@ -32,6 +32,7 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
   desc.add_options()("source-token",
                      po::value<std::string>()->default_value(""),
                      "target video source token authentication");
+
   desc.add_options()("hass-url", po::value<std::string>()->default_value(""),
                      "Home Assistant URL to send detector updates");
   desc.add_options()("hass-entity-id",
@@ -39,6 +40,13 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
                      "Home Assistant entity ID to update");
   desc.add_options()("hass-token", po::value<std::string>()->default_value(""),
                      "Home Assistant long-lived access token for API auth");
+
+  desc.add_options()("web-ui-host",
+                     po::value<std::string>()->default_value("0.0.0.0"),
+                     "host to bind the web UI to, defaults to localhost");
+  desc.add_options()("web-ui-port", po::value<int>()->default_value(32834),
+                     "port to bind the web UI to, defaults to 32834");
+
   desc.add_options()("detection-size", po::value<std::string>(),
                      "minimum size of a motion detection 'blob' that registers "
                      "as a region of interest\n"
@@ -80,6 +88,12 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
         if (envVar == "HASS_TOKEN"sv) {
           return "hass-token"s;
         }
+        if (envVar == "WEB_UI_HOST"sv) {
+          return "web-ui-host"s;
+        }
+        if (envVar == "WEB_UI_PORT"sv) {
+          return "web-ui-port"s;
+        }
         if (envVar == "DETECTION_SIZE"sv) {
           return "detection-size"s;
         }
@@ -107,6 +121,8 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
     hassUrl = boost::url(vm["hass-url"].as<std::string>());
     hassEntityId = vm["hass-entity-id"].as<std::string>();
     hassToken = vm["hass-token"].as<std::string>();
+    webUiHost = vm["web-ui-host"].as<std::string>();
+    webUiPort = vm["web-ui-port"].as<int>();
     if (auto it = vm.find("detection-size"); it != vm.end()) {
       const auto raw = it->second.as<std::string>();
       if (raw.empty()) {

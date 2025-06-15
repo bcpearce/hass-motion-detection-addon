@@ -74,9 +74,7 @@ docker:register:
     - DEB_FILE=$(find -type f -name motiondetection*.deb)
     - echo "Found $DEB_FILE to install in container"
     - docker build --tag $CONTAINER_RUN_IMAGE --build-arg MOTION_DETECTION_DEB=$DEB_FILE .
-    - docker tag $CONTAINER_RUN_IMAGE $DOCKER_HUB_USER/hass-motion-detection-addon:dev
     - docker push $CONTAINER_RUN_IMAGE
-    - docker push $DOCKER_HUB_USER/hass-motion-detection-addon:dev
 
 docker:register:release:
   stage: release

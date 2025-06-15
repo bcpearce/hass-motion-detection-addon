@@ -7,6 +7,8 @@ add_compile_definitions(
     $<$<CONFIG:Debug>:_DEBUG>
 )
 
+include_directories(AFTER "${CMAKE_BINARY_DIR}/include")
+
 set(OPENCV_MODULES "core;bgsegm;imgproc")
 
 option(USE_GRAPHICAL_USER_INTERFACE "Enable GUI backed by OpenCV's highgui module" OFF)
@@ -37,6 +39,7 @@ project(MotionDetection
     VERSION "0.1.0"
 )
 add_compile_definitions(MOTION_DETECTION_SEMVER="${PROJECT_VERSION}")
+add_compile_definitions(PROJECT_NAME="${PROJECT_NAME}")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -88,6 +91,31 @@ if (USE_GRAPHICAL_USER_INTERFACE)
     src/Gui/GuiHandler.cxx
     include/Gui/GuiHandler.h
   )
+  target_link_libraries(Gui PUBLIC
+    opencv_highgui
+  )
+else()
+  add_subdirectory(src/Gui)
+  add_library(Gui SHARED
+    src/Gui/public/index.html
+    src/Gui/WebHandler.cxx
+    include/Gui/WebHandler.h
+    include/index.h
+  )
+  file(GLOB_RECURSE GUI_PUBLIC_FILES "src/Gui/public/*")
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/public)
+  add_custom_command(
+      TARGET Gui POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${GUI_PUBLIC_FILES}
+        ${CMAKE_CURRENT_BINARY_DIR}/public/
+  )
+  find_package(unofficial-mongoose REQUIRED)
+  target_link_libraries(Gui PUBLIC
+    Detector
+    unofficial::mongoose::mongoose
+    VideoSource
+  )
 endif()
 
 add_executable(MotionDetection
@@ -95,11 +123,9 @@ add_executable(MotionDetection
 )
 
 if (EXISTS ${CMAKE_SOURCE_DIR}/.env)
-  add_custom_target(MotionDetectionDotEnv
-    ALL DEPENDS ${CMAKE_SOURCE_DIR}/.env)
   add_custom_command(
     TARGET MotionDetection POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${CMAKE_SOURCE_DIR}/.env
     $<TARGET_FILE_DIR:MotionDetection>/.env
 )
@@ -139,20 +165,13 @@ target_link_libraries(VideoSource PUBLIC
 )
 target_link_libraries(MotionDetection PRIVATE
   Detector
+  Gui
   HomeAssistant
   Util
   VideoSource
   opencv_core
   opencv_imgproc
 )
-if (USE_GRAPHICAL_USER_INTERFACE)
-  target_link_libraries(Gui PUBLIC
-    opencv_highgui
-  )
-  target_link_libraries(MotionDetection PRIVATE
-    Gui
-  )
-endif()
 
 if (WIN32)
   target_link_libraries(Util PUBLIC ws2_32 mswsock)
@@ -168,21 +187,18 @@ install(TARGETS MotionDetection
   EXPORT ${PROJECT_NAME}
   DESTINATION bin
 )
-install(TARGETS Util VideoSource Detector HomeAssistant
+install(TARGETS Detector Gui HomeAssistant Util VideoSource
   EXPORT ${PROJECT_NAME}
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib/${PROJECT_NAME}
 )
-if (USE_GRAPHICAL_USER_INTERFACE)
-  install(TARGETS Gui
-    EXPORT ${PROJECT_NAME}
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib/${PROJECT_NAME}
-  )
-endif()
 install(FILES LICENSE DESTINATION share/licenses/${PROJECT_NAME})
+install(DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/public DESTINATION share/${PROJECT_NAME}
+    FILE_PERMISSIONS WORLD_READ
+    DIRECTORY_PERMISSIONS WORLD_READ
+)
 
 option(PACK_PROJECT "Package the project for distribution" ON)
 if (PACK_PROJECT)

@@ -27,6 +27,8 @@
 #ifdef __linux__
 #include <X11/Xlib.h>
 #endif
+#else
+#include "Gui/WebHandler.h"
 #endif
 
 using namespace std::string_view_literals;
@@ -47,10 +49,10 @@ void App(const util::ProgramOptions &opts) {
   std::shared_ptr<video_source::VideoSource> pSource{nullptr};
   if (opts.url.scheme() == "http"sv || opts.url.scheme() == "https"sv) {
     pSource = std::make_shared<video_source::HttpVideoSource>(
-        opts.url.c_str(), opts.username, opts.password);
+        opts.url, opts.username, opts.password);
   } else if (opts.url.scheme() == "rtsp"sv) {
     pSource = std::make_shared<video_source::Live555VideoSource>(
-        opts.url.c_str(), opts.username, opts.password);
+        opts.url, opts.username, opts.password);
   } else {
     throw std::runtime_error(std::format("Invalid scheme {} for URL",
                                          std::string_view(opts.url.scheme())));
@@ -90,7 +92,11 @@ void App(const util::ProgramOptions &opts) {
 
 #ifdef USE_GRAPHICAL_USER_INTERFACE
   gui::GuiHandler gh;
-
+#else
+  gui::WebHandler gh(opts.webUiPort, opts.webUiHost);
+  std::cout << "Web interface started at " << gh.GetUrl() << "\n";
+  gh.Start();
+#endif
   auto onMotionDetectorCallbackGui = [&gh, pDetector,
                                       pSource](detector::Payload data) {
     gh({.rois = data.rois,
@@ -99,7 +105,6 @@ void App(const util::ProgramOptions &opts) {
         .fps = pSource->GetFramesPerSecond()});
   };
   pDetector->Subscribe(onMotionDetectorCallbackGui);
-#endif
 
   pSource->InitStream();
 
