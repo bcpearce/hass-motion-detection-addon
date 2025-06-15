@@ -18,6 +18,7 @@ cmake:build:$[[ inputs.PRESET ]]:
       - build/$PRESET/MotionDetection
       - build/$PRESET/*.so
       - build/$PRESET/tests/*Tests
+      - build/$PRESET/public/
       - build/$PRESET/**/*.cmake
       - build/$PRESET/**/*.txt
     when: on_success

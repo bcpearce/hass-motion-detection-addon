@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Detection Feed and Model</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			font-family: sans-serif;
+		}
+
+		.h1 {
+			padding: 20px;
+		}
+
+		.image-container {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 10px;
+			padding: 10px;
+		}
+
+		.image-container img {
+			width: 100%;
+			max-width: 48%;
+			height: auto;
+			border-radius: 8px;
+			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		}
+
+		@media (max-width: 600px) {
+			.image-container img {
+				max-width: 100%;
+			}
+		}
+	</style>
+</head>
+<body>
+	<h1>Motion Detection Live and Model</h1>
+	<div class="image-container">
+		<img src="/media/live" alt="Live Feed">
+		<img src="/media/model" alt="Detection Model">
+	</div>
+</body>
+</html>

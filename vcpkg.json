@@ -4,10 +4,16 @@
     "boost-url",
     "curl",
     "live555",
+    "ms-gsl",
+    "mongoose",
     {
       "name": "opencv4",
+      "default-features": false,
       "features": [
-        "contrib"
+        "contrib",
+        "jpeg",
+        "png",
+        "tiff"
       ]
     },
     "openh264",

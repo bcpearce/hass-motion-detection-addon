@@ -259,17 +259,15 @@ private:
   Live555VideoSource &rVideoSource_;
 };
 
-Live555VideoSource::Live555VideoSource(std::string_view url) : url_{url} {}
+Live555VideoSource::Live555VideoSource(const boost::url &url) : url_{url} {}
 
-Live555VideoSource::Live555VideoSource(std::string_view url,
+Live555VideoSource::Live555VideoSource(const boost::url &url,
                                        std::string_view username,
                                        std::string_view password)
     : url_{url} {
   url_.set_user(username);
   url_.set_password(password);
 }
-
-Live555VideoSource::Live555VideoSource(const boost::url &url) : url_{url} {}
 
 Live555VideoSource::~Live555VideoSource() {
   eventLoopWatchVar_.store(1);

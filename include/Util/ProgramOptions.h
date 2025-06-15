@@ -16,9 +16,13 @@ struct ProgramOptions {
   std::string token;
   std::string username;
   std::string password;
+
   boost::url hassUrl;
   std::string hassEntityId;
   std::string hassToken;
+
+  std::string webUiHost{"0.0.0.0"};
+  int webUiPort{32834};
 
   std::variant<int, double> detectionSize = 0.05;
   std::chrono::seconds detectionDebounce{30};

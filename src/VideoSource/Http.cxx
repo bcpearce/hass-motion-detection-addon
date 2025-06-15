@@ -13,7 +13,7 @@
 
 namespace video_source {
 
-HttpVideoSource::HttpVideoSource(const std::string &url,
+HttpVideoSource::HttpVideoSource(const boost::url &url,
                                  const std::string &token)
     : url_{url} {
   wCurl_(curl_easy_setopt, CURLOPT_URL, url_.c_str());
@@ -26,7 +26,7 @@ HttpVideoSource::HttpVideoSource(const std::string &url,
   }
 }
 
-HttpVideoSource::HttpVideoSource(const std::string &url,
+HttpVideoSource::HttpVideoSource(const boost::url &url,
                                  const std::string &username,
                                  const std::string &password)
     : HttpVideoSource(url) {
@@ -54,6 +54,8 @@ void HttpVideoSource::StopStream() {
 Frame HttpVideoSource::GetNextFrame() {
   if (wCurl_) {
     buf_.clear();
+
+    wCurl_(curl_easy_setopt, CURLOPT_TIMEOUT, timeout.count());
     const auto res = wCurl_(curl_easy_perform);
 
     if (res == CURLE_OK) {

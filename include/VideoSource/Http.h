@@ -9,6 +9,7 @@
 #include <boost/url.hpp>
 
 #include <array>
+#include <chrono>
 #include <thread>
 #include <vector>
 
@@ -16,9 +17,9 @@ namespace video_source {
 
 class HttpVideoSource : public VideoSource {
 public:
-  explicit HttpVideoSource(const std::string &url,
+  explicit HttpVideoSource(const boost::url &url,
                            const std::string &token = {});
-  HttpVideoSource(const std::string &url, const std::string &username,
+  HttpVideoSource(const boost::url &url, const std::string &username,
                   const std::string &password);
   ~HttpVideoSource() override = default;
 
@@ -26,6 +27,8 @@ public:
   void StopStream() override;
 
   Frame GetNextFrame();
+
+  std::chrono::duration<long> timeout{5};
 
 private:
   boost::url url_;

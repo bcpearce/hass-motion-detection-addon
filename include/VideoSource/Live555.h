@@ -21,10 +21,9 @@ class Live555VideoSource : public VideoSource {
 
 public:
   Live555VideoSource() noexcept = default;
-  explicit Live555VideoSource(std::string_view url);
-  Live555VideoSource(std::string_view url, std::string_view username,
+  explicit Live555VideoSource(const boost::url &url);
+  Live555VideoSource(const boost::url &url, std::string_view username,
                      std::string_view password);
-  Live555VideoSource(const boost::url &url);
   ~Live555VideoSource() override;
 
   void InitStream() override;
