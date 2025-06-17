@@ -23,3 +23,5 @@ repos:
     - id: detect-secrets
       args: ['--baseline', '.secrets.baseline']
       exclude: vcpkg.json
+
+ci: {}

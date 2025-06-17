@@ -18,7 +18,8 @@
     },
     "openh264",
     "openssl",
-    "nlohmann-json"
+    "nlohmann-json",
+    "spdlog"
   ],
   "features": {
     "graphical-user-interface": {

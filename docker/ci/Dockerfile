@@ -76,6 +76,10 @@ RUN apt-get install -y \
     python3 \
     python3-jinja2 \
     zip
+# Required for GitHub Actions
+RUN apt-get install -y \
+    nodejs \
+    npm
 
 # Set up VCPKG
 WORKDIR /

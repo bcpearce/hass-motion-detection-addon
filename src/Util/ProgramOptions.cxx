@@ -1,3 +1,4 @@
+#include "Logger.h"
 #include "WindowsWrapper.h"
 
 #include "Util/ProgramOptions.h"
@@ -142,7 +143,7 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
     }
   } catch (const std::exception &e) {
     std::cout << e.what() << "\n";
-    std::cout << desc << "\n";
+    std::cout << desc << std::endl;
     exit(1);
   }
 }

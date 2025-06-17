@@ -1,3 +1,4 @@
+#include "Logger.h"
 #include "WindowsWrapper.h"
 
 #include <array>
@@ -13,6 +14,8 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <openssl/ssl.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 #include "Detector/MotionDetector.h"
 #include "HomeAssistant/HassHandler.h"
@@ -40,12 +43,16 @@ std::atomic_bool gExitFlag{false};
 
 void SignalHandler(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
-    std::cout << "Received signal " << signal << ", closing stream...\n";
+    LOGGER->info("Received signal {} closing stream...", signal);
     gExitFlag.store(true);
   }
 }
 
 void App(const util::ProgramOptions &opts) {
+
+  auto stdoutLogger = logger::InitStderrLogger();
+  auto stderrLogger = logger::InitStdoutLogger();
+
   std::shared_ptr<video_source::VideoSource> pSource{nullptr};
   if (opts.url.scheme() == "http"sv || opts.url.scheme() == "https"sv) {
     pSource = std::make_shared<video_source::HttpVideoSource>(
@@ -79,8 +86,8 @@ void App(const util::ProgramOptions &opts) {
 
   std::shared_ptr<home_assistant::HassHandler> pHassHandler;
   if (opts.CanSetupHass()) {
-    std::cout << "Setting up Home Assistant status update for "
-              << opts.hassEntityId << " hosted at " << opts.hassUrl << "\n";
+    LOGGER->info("Setting up Home Assistant status update for {} hosted at {}",
+                 opts.hassEntityId, opts.hassUrl);
     pHassHandler = home_assistant::HassHandler::Create(
         opts.hassUrl, opts.hassToken, opts.hassEntityId);
     auto onMotionDetectionCallbackHass =
@@ -94,7 +101,7 @@ void App(const util::ProgramOptions &opts) {
   gui::GuiHandler gh;
 #else
   gui::WebHandler gh(opts.webUiPort, opts.webUiHost);
-  std::cout << "Web interface started at " << gh.GetUrl() << "\n";
+  LOGGER->info("Web interface started at {}", gh.GetUrl());
   gh.Start();
 #endif
   auto onMotionDetectorCallbackGui = [&gh, pDetector,
@@ -129,7 +136,7 @@ int main(int argc, const char **argv) {
     const util::ProgramOptions opts(argc, argv, true);
     App(opts);
   } catch (const std::exception &e) {
-    std::cout << e.what() << "\n";
+    ERR_LOGGER->critical(e.what());
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

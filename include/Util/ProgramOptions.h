@@ -1,5 +1,5 @@
-#ifndef PROGRAM_OPTIONS_H
-#define PROGRAM_OPTIONS_H
+#ifndef INCLUDE_UTIL_PROGRAM_OPTIONS_H
+#define INCLUDE_UTIL_PROGRAM_OPTIONS_H
 
 #include <string>
 #include <string_view>
@@ -17,7 +17,7 @@ struct ProgramOptions {
   std::string username;
   std::string password;
 
-  boost::url hassUrl;
+  boost::url hassUrl{""};
   std::string hassEntityId;
   std::string hassToken;
 

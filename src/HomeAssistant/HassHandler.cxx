@@ -1,3 +1,5 @@
+#include "Logger.h"
+
 #include "HomeAssistant/HassHandler.h"
 
 #include <chrono>
@@ -13,7 +15,7 @@ using namespace std::string_view_literals;
 
 namespace home_assistant {
 
-std::unique_ptr<HassHandler>
+[[nodiscard]] std::unique_ptr<HassHandler>
 home_assistant::HassHandler::Create(const boost::url &url,
                                     const std::string &token,
                                     std::string_view entityId) {
@@ -32,26 +34,49 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
 
   url_.set_path(std::format("/api/states/{}", entityId));
 
-  updaterThread_ = std::jthread([this](std::stop_token stopToken) {
-#ifdef _WIN32
-    SetThreadDescription(GetCurrentThread(),
-                         L"Home Assistant Handler Sensor Update Thread");
-#endif
+  util::CurlWrapper wCurl;
+  wCurl(curl_easy_setopt, CURLOPT_URL, url_.c_str());
+  wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
+  wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf_);
+  wCurl(curl_easy_setopt, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
+  wCurl(curl_easy_setopt, CURLOPT_XOAUTH2_BEARER, token_.c_str());
+  wCurl(curl_easy_setopt, CURLOPT_HTTPGET, 1L);
+  if (const auto res = wCurl(curl_easy_perform); res == CURLE_OK) {
+    int code{0};
+    wCurl(curl_easy_getinfo, CURLINFO_RESPONSE_CODE, &code);
 
-    util::CurlWrapper wCurl;
-    wCurl(curl_easy_setopt, CURLOPT_URL, url_.c_str());
-    wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
-    wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf_);
-    wCurl(curl_easy_setopt, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
-    wCurl(curl_easy_setopt, CURLOPT_XOAUTH2_BEARER, token_.c_str());
-    wCurl(curl_easy_setopt, CURLOPT_HTTPGET, 1L);
-    if (const auto res = wCurl(curl_easy_perform); res == CURLE_OK) {
+    switch (code) {
+    case 200:
+    case 201: {
       const auto tmpState = json::parse(buf_);
       currentState_["state"] = tmpState["state"];
       currentState_["entity_id"] = tmpState["entity_id"];
       currentState_["attributes"] = tmpState["attributes"];
       nextState_ = currentState_;
+    } break;
+    default: {
+      char *ct{nullptr};
+      wCurl(curl_easy_getinfo, CURLINFO_CONTENT_TYPE, &ct);
+      std::string_view contentTypeDesc = ""sv;
+      if (ct) {
+        std::string_view ctVw{ct};
+        if ("application/xml"sv == ctVw || "application/json"sv == ctVw ||
+            ctVw.starts_with("text"))
+          contentTypeDesc = std::string_view(buf_.data(), buf_.size());
+      }
+      throw std::runtime_error(
+          std::format("Failed get base status of entity {} with code {}: {}",
+                      entityId, code, contentTypeDesc));
     }
+    }
+  }
+
+  updaterThread_ = std::jthread([this, wCurl = std::move(wCurl)](
+                                    std::stop_token stopToken) mutable {
+#ifdef _WIN32
+    SetThreadDescription(GetCurrentThread(),
+                         L"Home Assistant Handler Sensor Update Thread");
+#endif
 
     std::string payload;
     std::string_view payloadView;
@@ -63,7 +88,9 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
     using sc = std::chrono::steady_clock;
 
     // Delay updating the state initially as the feed is still stabilizing
-    sc::time_point lastStateUpdate = sc::now() + std::chrono::seconds(30);
+    sc::time_point lastStateUpdate =
+        sc::now() +
+        std::chrono::duration_cast<std::chrono::seconds>(debounceTime);
     std::unique_lock lk(mtx_);
     do {
       cv_.wait_for(lk, 5s);
@@ -77,13 +104,37 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
 
         payload = nextState_.dump();
         payloadView = payload;
+        try {
+          wCurl(curl_easy_perform);
+          int code{0};
+          wCurl(curl_easy_getinfo, CURLINFO_RESPONSE_CODE, &code);
 
-        const auto res = wCurl(curl_easy_perform);
-        std::cout << sc::now().time_since_epoch() << " updated hass with state "
-                  << nextState_["state"] << "\n";
+          switch (code) {
+          case 200:
+          case 201:
+            LOGGER->info("Updated {} with state {}",
+                         nextState_["entity_id"].template get<std::string>(),
+                         nextState_["state"].template get<std::string>());
 
-        currentState_ = nextState_;
-        lastStateUpdate = sc::now();
+            currentState_ = nextState_;
+            lastStateUpdate = sc::now();
+            break;
+          default: {
+            char *ct{nullptr};
+            wCurl(curl_easy_getinfo, CURLINFO_CONTENT_TYPE, &ct);
+            std::string_view ctVw{ct};
+            std::string_view contentTypeDesc =
+                ("application/xml"sv == ctVw || "application/json"sv == ctVw ||
+                 ctVw.starts_with("text"))
+                    ? std::string_view(buf_.data(), buf_.size())
+                    : ""sv;
+            LOGGER->error("Failed to update status with code {}: {}", code,
+                          contentTypeDesc);
+          } break;
+          }
+        } catch (const std::exception &e) {
+          LOGGER->error(e.what());
+        }
       }
     } while (!stopToken.stop_requested());
   });

@@ -13,9 +13,9 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
-
 namespace home_assistant {
+
+using json = nlohmann::json;
 
 class HassHandler {
 
@@ -35,7 +35,9 @@ public:
 
   virtual void
   operator()(std::optional<detector::RegionsOfInterest> rois = {}) = 0;
+  std::chrono::duration<double> debounceTime{30.0};
 
+protected:
   void UpdateState(std::string_view state, const json &attributes = {});
 
 private:
@@ -47,7 +49,6 @@ private:
   // initialize this true forces initial update
   json currentState_;
   json nextState_;
-  std::chrono::duration<double> debounceTime{30.0};
 
   std::condition_variable_any cv_;
   std::shared_mutex mtx_;
