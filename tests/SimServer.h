@@ -8,6 +8,11 @@
 #include <boost/url.hpp>
 #include <gtest/gtest.h>
 
+namespace sim_token {
+static constexpr const char *bearer{
+    "5EA55652E6C64F0D8BDD72C16098248A"}; // pragma: allowlist secret
+}
+
 class SimServer {
 protected:
   struct Token {};
@@ -19,6 +24,9 @@ public:
 
   explicit SimServer(Token, int port);
   ~SimServer() noexcept = default;
+
+  static int GetHassApiCount();
+  static void ev_handler(struct mg_connection *c, int ev, void *ev_data);
 
 protected:
   SimServer() = delete;

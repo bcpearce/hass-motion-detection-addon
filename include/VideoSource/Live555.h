@@ -29,7 +29,7 @@ public:
   void InitStream() override;
   void StopStream() override;
 
-  std::string GetSafeUrl() const;
+  const boost::url &GetUrl() const { return url_; };
 
 private:
   void SetYUVFrame(uint8_t **pDataYUV, int width, int height, int strideY,

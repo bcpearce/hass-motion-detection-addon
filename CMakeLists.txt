@@ -31,12 +31,12 @@ if(WIN32)
 endif()
 
 if (MSVC)
-    add_compile_options("/external:W0 /external:anglebrackets")
+    add_compile_options("/external:W0 /external:anglebrackets /utf-8")
 endif()
 
 project(MotionDetection
     DESCRIPTION "Motion detection for video feeds"
-    VERSION "0.1.0"
+    VERSION "0.2.0"
 )
 add_compile_definitions(MOTION_DETECTION_SEMVER="${PROJECT_VERSION}")
 add_compile_definitions(PROJECT_NAME="${PROJECT_NAME}")
@@ -56,6 +56,7 @@ find_package(OpenCV REQUIRED COMPONENTS
 )
 find_package(OpenSSL CONFIG REQUIRED)
 find_package(OpenH264 REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
 
 add_library(Detector SHARED
@@ -119,6 +120,8 @@ else()
 endif()
 
 add_executable(MotionDetection
+    include/Logger.h
+    include/WindowsWrapper.h
     src/main.cxx
 )
 
@@ -131,17 +134,19 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/.env)
 )
 endif()
 
-include_directories(include)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 target_link_libraries(Detector PUBLIC
   opencv_core
   opencv_imgproc
   opencv_bgsegm
+  spdlog::spdlog
 )
 target_link_libraries(HomeAssistant PUBLIC
   Boost::url
   Detector
   nlohmann_json::nlohmann_json
+  spdlog::spdlog
   Util
 )
 target_link_libraries(Util PUBLIC
@@ -150,6 +155,7 @@ target_link_libraries(Util PUBLIC
   Boost::url
   OpenSSL::SSL
   OpenSSL::Crypto
+  spdlog::spdlog
 )
 target_link_libraries(VideoSource PUBLIC
   Util
@@ -162,6 +168,7 @@ target_link_libraries(VideoSource PUBLIC
   opencv_core
   opencv_imgproc
   opencv_imgcodecs
+  spdlog::spdlog
 )
 target_link_libraries(MotionDetection PRIVATE
   Detector
@@ -171,6 +178,7 @@ target_link_libraries(MotionDetection PRIVATE
   VideoSource
   opencv_core
   opencv_imgproc
+  spdlog::spdlog
 )
 
 if (WIN32)

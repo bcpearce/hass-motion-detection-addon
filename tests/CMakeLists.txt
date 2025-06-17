@@ -8,13 +8,17 @@ add_executable(MotionDetectionTests
   SimServer.cxx
   SimServer.h
   TestCurlWrapper.cxx
+  TestHassHandler.cxx
   TestProgramOptions.cxx
   TestMotionDetector.cxx
-  TestVideoSource.cxx)
+  TestVideoSource.cxx
+)
 
 target_link_libraries(
   MotionDetectionTests PRIVATE
   Detector
+  HomeAssistant
+  nlohmann_json::nlohmann_json
   unofficial::mongoose::mongoose
   Util
   VideoSource

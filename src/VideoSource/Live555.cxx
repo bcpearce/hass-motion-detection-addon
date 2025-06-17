@@ -1,3 +1,4 @@
+#include "Logger.h"
 #include "WindowsWrapper.h"
 
 #include "VideoSource/Live555.h"
@@ -12,25 +13,73 @@
 
 using namespace std::string_view_literals;
 
+namespace {
+[[nodiscard]] std::string MakeDecoderError(DECODING_STATE state,
+                                           unsigned int errMask) {
+  thread_local std::vector<std::string_view> errors;
+  errors.clear();
+  if (state & dsFramePending) {
+    errors.push_back("FramePending"sv);
+  }
+  if (state & dsRefLost) {
+    errors.push_back("RefLost"sv);
+  }
+  if (state & dsBitstreamError) {
+    errors.push_back("BitstreamError"sv);
+  }
+  if (state & dsDepLayerLost) {
+    errors.push_back("DepLayerLost"sv);
+  }
+  if (state & dsNoParamSets) {
+    errors.push_back("NoParamSets"sv);
+  }
+  if (state & dsDataErrorConcealed) {
+    errors.push_back("DataErrorConcealed"sv);
+  }
+  if (state & dsRefListNullPtrs) {
+    errors.push_back("RefListNullPtrs"sv);
+  }
+  if (state & dsInvalidArgument) {
+    errors.push_back("InvalidArgument"sv);
+  }
+  if (state & dsInitialOptExpected) {
+    errors.push_back("InitialOptExpected"sv);
+  }
+  if (state & dsOutOfMemory) {
+    errors.push_back("OutOfMemory"sv);
+  }
+  if (state & dsDstBufNeedExpan) {
+    errors.push_back("DstBufNeedExpan"sv);
+  }
+  std::stringstream ss;
+  for (size_t i = 0; auto error : errors) {
+    ss << error << (++i < errors.size() ? ", "sv : ""sv);
+  }
+
+  return std::format("Errors decoding stream ({:X}): {}"sv, int(state),
+                     ss.str());
+}
+} // namespace
+
+template <>
+struct fmt::formatter<RTSPClient> : fmt::formatter<std::string_view> {
+  auto format(const RTSPClient &rtspClient,
+              format_context &ctx) const -> decltype(ctx.out()) {
+    return fmt::format_to(ctx.out(), "[RTSP URL: {}]",
+                          boost::url(rtspClient.url()));
+  }
+};
+
+template <>
+struct fmt::formatter<MediaSubsession> : fmt::formatter<std::string_view> {
+  auto format(const MediaSubsession &subsession,
+              format_context &ctx) const -> decltype(ctx.out()) {
+    return fmt::format_to(ctx.out(), "{}/{}", subsession.mediumName(),
+                          subsession.codecName());
+  }
+};
+
 namespace video_source {
-
-// A function that outputs a string that identifies each stream (for debugging
-// output)
-UsageEnvironment &operator<<(UsageEnvironment &env,
-                             const RTSPClient &rtspClient) {
-  return env << "[URL:\"" << rtspClient.url() << "\"]: ";
-}
-
-// A function that outputs a string that identifies each subsession (for
-// debugging output)
-UsageEnvironment &operator<<(UsageEnvironment &env,
-                             const MediaSubsession &subsession) {
-  return env << subsession.mediumName() << "/" << subsession.codecName();
-}
-
-UsageEnvironment &operator<<(UsageEnvironment &env, const std::string &s) {
-  return env << s.c_str();
-}
 
 // RTSP 'response handlers':
 void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode,
@@ -96,6 +145,19 @@ public:
   Live555VideoSource &rVideoSource_;
   StreamClientState scs;
 };
+} // namespace video_source
+
+template <>
+struct fmt::formatter<video_source::FrameRtspClient>
+    : fmt::formatter<std::string_view> {
+  auto format(const video_source::FrameRtspClient &rtspClient,
+              format_context &ctx) const -> decltype(ctx.out()) {
+    return fmt::format_to(ctx.out(), "[RTSP URL: {}]",
+                          boost::url(rtspClient.url()));
+  }
+};
+
+namespace video_source {
 
 class FrameSetterSink : public MediaSink {
 public:
@@ -149,26 +211,22 @@ private:
                          timeval presentationTime,
                          unsigned int durationInMicroseconds) {
 #ifdef _DEBUG
-    envir() << "Stream \"" << rVideoSource_.GetSafeUrl() << "\"; ("
-            << std::to_string(rVideoSource_.GetCurrentFrame().id + 1) << ") "
-            << rSubsession_.mediumName() << "/" << rSubsession_.codecName()
-            << ":\tReceived " << frameSize << " bytes";
-    if (numTruncatedBytes > 0) {
-      envir() << " (with " << numTruncatedBytes << " bytes truncated)";
-    }
-    char uSecsStr[6 + 1]; // used to output the 'microseconds' part of the
-                          // presentation time
-    sprintf(uSecsStr, "%06u", (unsigned)presentationTime.tv_usec);
-    envir() << ".\tPresentation time: " << (int)presentationTime.tv_sec << "."
-            << uSecsStr;
-
-    if (rSubsession_.rtpSource() &&
-        !rSubsession_.rtpSource()->hasBeenSynchronizedUsingRTCP()) {
-      envir() << "!"; // mark the debugging output to indicate that this
-                      // presentation time is not RTCP-synchronized
-    }
-    envir() << "\tNPT: " << rSubsession_.getNormalPlayTime(presentationTime)
-            << "\n";
+    const std::string truncatedMsg =
+        (numTruncatedBytes > 0)
+            ? std::format(" (with {} bytes truncated)", numTruncatedBytes)
+            : "";
+    const std::string_view syncMarker =
+        (rSubsession_.rtpSource() &&
+         !rSubsession_.rtpSource()->hasBeenSynchronizedUsingRTCP())
+            ? "!"sv
+            : ""sv;
+    LOGGER->debug("{} {} ({}):\tReceived {} bytes{} \tPresentation time: "
+                  "{}.{:06d}{}\tNPT: {}",
+                  *rVideoSource_.pRtspClient_, rSubsession_,
+                  rVideoSource_.GetCurrentFrame().id + 1, frameSize,
+                  truncatedMsg, presentationTime.tv_sec,
+                  presentationTime.tv_usec, syncMarker,
+                  rSubsession_.getNormalPlayTime(presentationTime));
 #endif
     memset(&sDstBufInfo_, 0, sizeof(SBufferInfo));
     pDataYUV_[0] = pDataYUV_[1] = pDataYUV_[2] = nullptr;
@@ -178,42 +236,7 @@ private:
     constexpr unsigned int errMask =
         dsBitstreamError | dsNoParamSets | dsDepLayerLost;
     if (res != 0 && (res & errMask)) {
-      std::cerr << "Errors decoding stream: (" << std::hex << std::showbase
-                << res << ") ";
-      if (res & dsFramePending) {
-        std::cerr << "FramePending ";
-      }
-      if (res & dsRefLost) {
-        std::cerr << "RefLost ";
-      }
-      if (res & dsBitstreamError) {
-        std::cerr << "BitstreamError ";
-      }
-      if (res & dsDepLayerLost) {
-        std::cerr << "DepLayerLost ";
-      }
-      if (res & dsNoParamSets) {
-        std::cerr << "NoParamSets ";
-      }
-      if (res & dsDataErrorConcealed) {
-        std::cerr << "DataErrorConcealed ";
-      }
-      if (res & dsRefListNullPtrs) {
-        std::cerr << "RefListNullPtrs ";
-      }
-      if (res & dsInvalidArgument) {
-        std::cerr << "InvalidArgument ";
-      }
-      if (res & dsInitialOptExpected) {
-        std::cerr << "InitialOptExpected ";
-      }
-      if (res & dsOutOfMemory) {
-        std::cerr << "OutOfMemory ";
-      }
-      if (res & dsDstBufNeedExpan) {
-        std::cerr << "DstBufNeedExpan ";
-      }
-      std::cerr << std::endl;
+      LOGGER->warn(MakeDecoderError(res, errMask));
     }
 
     if (sDstBufInfo_.iBufferStatus == 1) {
@@ -292,7 +315,7 @@ void Live555VideoSource::InitStream() {
                                             "Motion-Detector");
   if (!pRtspClient_) {
     auto tmpUrl = url_;
-    tmpUrl.set_password("*******");
+    tmpUrl.set_password("********");
     throw std::runtime_error(std::format(
         "Failed to create RTSP client to connect to {}", tmpUrl.c_str()));
   }
@@ -309,13 +332,6 @@ void Live555VideoSource::InitStream() {
 void Live555VideoSource::StopStream() {
   eventLoopWatchVar_.store(1);
   eventLoopThread_ = {};
-}
-
-std::string Live555VideoSource::GetSafeUrl() const {
-  thread_local boost::url safeUrl;
-  safeUrl = url_;
-  safeUrl.set_password("********");
-  return safeUrl.c_str();
 }
 
 #define FULL_COLOR 0
@@ -349,7 +365,7 @@ void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
     frame.timeStamp = std::chrono::steady_clock::now();
     this->SetFrame(frame);
   } catch (const std::exception &e) {
-    std::cout << e.what() << "\n";
+    LOGGER->error(e.what());
   }
 }
 
@@ -360,28 +376,28 @@ void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode,
     StreamClientState &scs = ((FrameRtspClient *)rtspClient)->scs; // alias
 
     if (resultCode != 0) {
-      env << *rtspClient << "Failed to get a SDP description: " << resultString
-          << "\n";
+      LOGGER->error("{} Failed to get a SDP description: {}", *rtspClient,
+                    resultString);
       delete[] resultString;
       break;
     }
 
     char *const sdpDescription = resultString;
-    env << *rtspClient << "Got a SDP description:\n" << sdpDescription << "\n";
+    LOGGER->info("{} Got an SDP description:", *rtspClient);
+    LOGGER->info("{}", sdpDescription);
 
     // Create a media session object from this SDP description:
     scs.session = MediaSession::createNew(env, sdpDescription);
     delete[] sdpDescription; // because we don't need it anymore
-    if (scs.session == NULL) {
-      env << *rtspClient
-          << "Failed to create a MediaSession object from the SDP "
-             "description: "
-          << env.getResultMsg() << "\n";
+    if (scs.session == nullptr) {
+      LOGGER->error("{} Failed to create a MediaSession object from the SDP "
+                    "description: {}",
+                    *rtspClient, env.getResultMsg());
       break;
     } else if (!scs.session->hasSubsessions()) {
-      env << *rtspClient
-          << "This session has no media subsessions (i.e., no \"m=\" "
-             "lines)\n";
+      LOGGER->warn("{} This session has no media subsessions (i.e., no \"m=\" "
+                   "lines)",
+                   *rtspClient);
       break;
     }
 
@@ -408,22 +424,21 @@ void setupNextSubsession(RTSPClient *rtspClient) {
   StreamClientState &scs = ((FrameRtspClient *)rtspClient)->scs; // alias
 
   scs.subsession = scs.iter->next();
-  if (scs.subsession != NULL) {
+  if (scs.subsession != nullptr) {
     if (!scs.subsession->initiate()) {
-      env << *rtspClient << "Failed to initiate the \"" << *scs.subsession
-          << "\" subsession: " << env.getResultMsg() << "\n";
+      LOGGER->error("{} Failed to initiate the \"{}\" subsession: {}",
+                    *rtspClient, *scs.subsession, env.getResultMsg());
       setupNextSubsession(
           rtspClient); // give up on this subsession; go to the next one
     } else {
-      env << *rtspClient << "Initiated the \"" << *scs.subsession
-          << "\" subsession (";
-      if (scs.subsession->rtcpIsMuxed()) {
-        env << "client port " << scs.subsession->clientPortNum();
-      } else {
-        env << "client ports " << scs.subsession->clientPortNum() << "-"
-            << scs.subsession->clientPortNum() + 1;
-      }
-      env << ")\n";
+      const std::string muxMsg =
+          scs.subsession->rtcpIsMuxed()
+              ? std::format("client port {}", scs.subsession->clientPortNum())
+              : std::format("client ports {}-{}",
+                            scs.subsession->clientPortNum(),
+                            scs.subsession->clientPortNum() + 1);
+      LOGGER->info("{} Initiated the \"{}\" subsession ({})", *rtspClient,
+                   *scs.subsession, muxMsg);
 
       // Continue setting up this subsession, by sending a RTSP "SETUP"
       // command:
@@ -455,20 +470,18 @@ void continueAfterSETUP(RTSPClient *rtspClient, int resultCode,
     StreamClientState &scs = frameRtspClient->scs; // alias
 
     if (resultCode != 0) {
-      env << *rtspClient << "Failed to set up the \"" << *scs.subsession
-          << "\" subsession: " << resultString << "\n";
+      LOGGER->error("{} Failed to set up the \"{}\" subsession: {}",
+                    *rtspClient, *scs.subsession, resultString);
       break;
     }
 
-    env << *rtspClient << "Set up the \"" << *scs.subsession
-        << "\" subsession (";
-    if (scs.subsession->rtcpIsMuxed()) {
-      env << "client port " << scs.subsession->clientPortNum();
-    } else {
-      env << "client ports " << scs.subsession->clientPortNum() << "-"
-          << scs.subsession->clientPortNum() + 1;
-    }
-    env << ")\n";
+    const std::string muxMsg =
+        scs.subsession->rtcpIsMuxed()
+            ? std::format("client port {}", scs.subsession->clientPortNum())
+            : std::format("client ports {}-{}", scs.subsession->clientPortNum(),
+                          scs.subsession->clientPortNum() + 1);
+    LOGGER->info("{} Initiated the \"{}\" subsession ({})", *rtspClient,
+                 *scs.subsession, muxMsg);
 
     // Having successfully setup the subsession, create a data sink for it,
     // and call "startPlaying()" on it. (This will prepare the data sink to
@@ -479,17 +492,19 @@ void continueAfterSETUP(RTSPClient *rtspClient, int resultCode,
         "H264"sv == scs.subsession->codecName()) {
       scs.subsession->sink = FrameSetterSink::CreateNew(
           env, *scs.subsession, frameRtspClient->rVideoSource_);
-    }
-
-    // perhaps use your own custom "MediaSink" subclass instead
-    if (!scs.subsession->sink) {
-      env << *rtspClient << "Failed to create a data sink for the \""
-          << *scs.subsession << "\" subsession: " << env.getResultMsg() << "\n";
+      if (!scs.subsession->sink) {
+        LOGGER->error(
+            "{} Failed to create a data sink for the \"{}\" subsession: {}",
+            *rtspClient, *scs.subsession, env.getResultMsg());
+        break;
+      }
+    } else {
       break;
     }
+    // no sink for audio channels
 
-    env << *rtspClient << "Created a data sink for the \"" << *scs.subsession
-        << "\" subsession\n";
+    LOGGER->info("{} Created a data sink for the \"{}\" subsession",
+                 *rtspClient, *scs.subsession);
     scs.subsession->miscPtr =
         rtspClient; // a hack to let subsession handler functions get the
                     // "RTSPClient" from the subsession
@@ -497,7 +512,7 @@ void continueAfterSETUP(RTSPClient *rtspClient, int resultCode,
                                        subsessionAfterPlaying, scs.subsession);
     // Also set a handler to be called if a RTCP "BYE" arrives for this
     // subsession:
-    if (scs.subsession->rtcpInstance() != NULL) {
+    if (scs.subsession->rtcpInstance() != nullptr) {
       scs.subsession->rtcpInstance()->setByeWithReasonHandler(
           subsessionByeHandler, scs.subsession);
     }
@@ -517,16 +532,14 @@ void continueAfterPLAY(RTSPClient *rtspClient, int resultCode,
     StreamClientState &scs = ((FrameRtspClient *)rtspClient)->scs; // alias
 
     if (resultCode != 0) {
-      env << *rtspClient << "Failed to start playing session: " << resultString
-          << "\n";
+      LOGGER->error("{} Failed to start playing session: {}", *rtspClient,
+                    resultString);
       break;
     }
-
-    env << *rtspClient << "Started playing session";
+    LOGGER->info("{} Started playing session", *rtspClient);
     if (scs.duration > 0) {
-      env << " (for up to " << scs.duration << " seconds)";
+      LOGGER->info("(for up to {} seconds)", scs.duration);
     }
-    env << "...\n";
 
     success = True;
   } while (0);
@@ -565,12 +578,15 @@ void subsessionByeHandler(void *clientData, char const *reason) {
   RTSPClient *rtspClient = (RTSPClient *)subsession->miscPtr;
   UsageEnvironment &env = rtspClient->envir(); // alias
 
-  env << *rtspClient << "Received RTCP \"BYE\"";
-  if (reason != NULL) {
-    env << " (reason:\"" << reason << "\")";
+  if (reason != nullptr) {
+    LOGGER->warn(
+        "{} Received RTCP \"BYE\" (REASON:\"{}\") on \"{}\" subsession",
+        *rtspClient, reason, *subsession);
     delete[] (char *)reason;
+  } else {
+    LOGGER->info("{} Received RTCP \"BYE\" on \"{}\" subsession", *rtspClient,
+                 *subsession);
   }
-  env << " on \"" << *subsession << "\" subsession\n";
 
   // Now act as if the subsession had closed:
   subsessionAfterPlaying(subsession);
@@ -612,7 +628,7 @@ void shutdownStream(RTSPClient *rtspClient) {
     }
   }
 
-  env << *rtspClient << "Closing the stream.\n";
+  LOGGER->info("{} Closing the stream.", *rtspClient);
   Medium::close(rtspClient);
   // Note that this will also cause this stream's "StreamClientState"
   // structure to get reclaimed.

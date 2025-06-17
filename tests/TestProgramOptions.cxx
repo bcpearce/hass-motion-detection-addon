@@ -20,18 +20,23 @@ TEST(ProgramOptionsTests, ParseDetectionSize) {
 }
 
 TEST(ProgramOptionsTests, CanSetupHass) {
-  std::vector<const char *> argv{"MotionDetection", "--source-url",
-                                 "rtsp://feed.example.com:554"};
-  const util::ProgramOptions progOptsFalse(argv.size(), argv.data());
-  EXPECT_FALSE(progOptsFalse.CanSetupHass());
+  static const char *argvFalse[3] = {PROJECT_NAME, "--source-url",
+                                     "rtsp://feed.example.com:554"};
+  const util::ProgramOptions progOptsFalse(3, argvFalse);
+  EXPECT_FALSE(progOptsFalse.CanSetupHass())
+      << "Options " << argvFalse[0] << " " << argvFalse[1] << " "
+      << argvFalse[2] << " will set up Hass endpoint, but should not";
 
-  argv.push_back("--hass-url");
-  argv.push_back("https://hass.example.com");
-  argv.push_back("--hass-entity-id");
-  argv.push_back("binary_sensor.hello");
-  argv.push_back("--hass-token");
-  argv.push_back("abcd");
+  static const char *argvTrue[9] = {PROJECT_NAME,
+                                    "--source-url",
+                                    "rtsp://feed.example.com:554",
+                                    "--hass-url",
+                                    "https://hass.example.com",
+                                    "--hass-entity-id",
+                                    "binary_sensor.hello",
+                                    "--hass-token",
+                                    "abcd"};
 
-  const util::ProgramOptions progOptsTrue(argv.size(), argv.data());
+  const util::ProgramOptions progOptsTrue(9, argvTrue);
   EXPECT_TRUE(progOptsTrue.CanSetupHass());
 }

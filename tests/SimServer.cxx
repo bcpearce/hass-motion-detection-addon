@@ -3,19 +3,26 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#define JSON_USE_IMPLICIT_CONVERSIONS 0
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <format>
 
 namespace {
 
+using json = nlohmann::json;
+
 static std::unique_ptr<SimServer> pServer;
 static boost::url url;
 
 static std::jthread listenerThread;
+static std::atomic_int hassApiCalls_{0};
+
+} // namespace
 
 // HTTP server event handler function
-void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
+void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
   if (ev == MG_EV_HTTP_MSG) {
     struct mg_http_message *hm = (struct mg_http_message *)ev_data;
 
@@ -45,11 +52,29 @@ void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
       mg_send(c, "\r\n", 2);
     } else if (mg_match(hm->uri, mg_str("/api/hello"), nullptr)) {
       mg_http_reply(c, 200, "", "Hello There");
+    } else if (mg_str entity_id[2];
+               mg_match(hm->uri, mg_str("/api/states/*"), entity_id)) {
+
+      // handle auth
+      std::array<char, 256> user, pass;
+      mg_http_creds(hm, user.data(), user.size(), pass.data(), pass.size());
+      // expect bearer token for hass simulation
+      if (std::string_view(user.data()).empty() &&
+          std::string_view(pass.data()) ==
+              std::string_view(sim_token::bearer)) {
+        json responseObj;
+        responseObj["entity_id"] =
+            std::string(entity_id[0].buf, entity_id[0].len);
+        responseObj["state"] = "on";
+        responseObj["attributes"] = {};
+        mg_http_reply(c, 200, "", responseObj.dump().c_str());
+      } else {
+        mg_http_reply(c, 401, "", "%s", "401: Unauthorized");
+      }
+      ++hassApiCalls_;
     }
   }
 }
-
-} // namespace
 
 SimServer::SimServer(Token, int port) {
   url.set_scheme("http");
@@ -78,3 +103,5 @@ void SimServer::Start(int port) {
 void SimServer::Stop() { listenerThread = {}; }
 
 const boost::url &SimServer::GetBaseUrl() { return url; }
+
+int SimServer::GetHassApiCount() { return hassApiCalls_.load(); }
