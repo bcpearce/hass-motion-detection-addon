@@ -79,20 +79,11 @@ RUN apt-get install -y \
 # Required for GitHub Actions
 RUN apt-get install -y \
     nodejs \
-    npm
+    npm \
+    mono-complete
 
-# Set up VCPKG
-WORKDIR /
-RUN git clone https://github.com/microsoft/vcpkg.git
-
-ENV VCPKG_ROOT="/vcpkg"
-ENV PATH="$VCPKG_ROOT:/usr/bin/ninja:$PATH"
-
-ARG VCPKG_COMMIT=8f54ef5453e7e76ff01e15988bf243e7247c5eb5
-
-RUN cd vcpkg && git checkout ${VCPKG_COMMIT} && ./bootstrap-vcpkg.sh
+ENV PATH="/usr/bin/ninja:$PATH"
 
 WORKDIR /project
-COPY build.sh /project/build.sh
 
 RUN ["/bin/bash"]
