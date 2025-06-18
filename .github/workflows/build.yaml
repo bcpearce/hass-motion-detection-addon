@@ -13,35 +13,12 @@ env:
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
 
 jobs:
-  prepare_docker_build_image:
-    name: Prepare Docker Build Image
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/ci/Dockerfile
-          push: true
-          pull: true
-          tags: |
-              ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:${{ github.ref_name }}
-              ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:dev
 
   build_and_test:
-    needs: prepare_docker_build_image
     name: Build and Test
     runs-on: ubuntu-latest
     container:
-      image: ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:${{ github.ref_name }}
+      image: ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:dev
     steps:
       - uses: actions/checkout@v4
       - name: Get VCPKG
