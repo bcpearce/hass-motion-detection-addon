@@ -28,5 +28,4 @@ repos:
   hooks:
     - id: actionlint
 
-ci:
-  skip: [ ]
+ci: {}
