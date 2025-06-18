@@ -1,4 +1,4 @@
-name: Build Project
+name: Build Project (Linux)
 
 on:
   - push
@@ -15,7 +15,7 @@ env:
 jobs:
 
   build_and_test:
-    name: Build and Test
+    name: Build and Test (Linux)
     runs-on: ubuntu-latest
     container:
       image: ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:dev
@@ -65,6 +65,7 @@ jobs:
           if-no-files-found: error
 
   build_and_upload_image:
+    name: Build and Upload Docker Image (Linux)
     needs: build_and_test
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
