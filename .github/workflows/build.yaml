@@ -1,0 +1,119 @@
+name: Build Project
+
+on:
+  - push
+  - pull_request
+
+env:
+  USERNAME: bcpearce
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+  VCPKG_GIT_REF: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
+  FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
+  VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
+
+jobs:
+  prepare_docker_build_image:
+    name: Prepare Docker Build Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/ci/Dockerfile
+          push: true
+          pull: true
+          tags: |
+              ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:${{ github.ref_name }}
+              ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:dev
+
+  build_and_test:
+    needs: prepare_docker_build_image
+    name: Build and Test
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get VCPKG
+        run: |
+            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+      - name: Bootstrap vcpkg
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
+      - name: Add NuGet sources
+        env:
+          VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+          USERNAME: bcpearce
+          FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
+        run: |
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            sources add \
+            -Source "${{ env.FEED_URL }}" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${{ env.USERNAME }}" \
+            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
+            -Source "${{ env.FEED_URL }}"
+      - name: Generate and Configure Debug
+        run: cmake . --preset=Debug -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+      - name: Build Debug
+        run: cmake --build build/Debug
+      - name: Test Debug
+        run: ./build/Debug/tests/MotionDetectionTests --gtest_output=xml
+      - name: Generate and Configure Release
+        run: cmake . --preset=Release -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+      - name: Build Release
+        run: cmake --build build/Release
+      - name: Test Release
+        run: ./build/Release/tests/MotionDetectionTests --gtest_output=xml
+      - name: Pack
+        run: cd build/Release && cpack -G DEB  -DCPACK_DEBIAN_FILE_NAME=motion-detection.deb
+      - name: Upload .deb Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-detection-deb
+          path: build/Release/motion-detection.deb
+          if-no-files-found: error
+
+  build_and_upload_image:
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Download packed build
+        uses: actions/download-artifact@v4
+        with:
+          name: motion-detection-deb
+          path: ${{ github.workspace }}/docker/deploy
+      - run: ls -R
+        if: runner.debug == '1'
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/deploy/Dockerfile
+          build-args: MOTION_DETECTION_DEB=./docker/deploy/motion-detection.deb
+          push: true
+          tags: |
+              ${{ vars.DOCKERHUB_USERNAME }}/hass-motion-detection-addon:latest
+              ${{ vars.DOCKERHUB_USERNAME }}/hass-motion-detection-addon:${{ github.ref_name }}
