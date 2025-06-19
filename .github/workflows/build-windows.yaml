@@ -48,7 +48,7 @@ jobs:
       - name: Build Debug
         run: cmake --build build/Debug
       - name: Test Debug
-        run: ./build/Debug/MotionDetectionTests --gtest_output=xml
+        run: ./build/Debug/MotionDetectionTests --gtest_output=xml:test_detail_debug.xml
       - name: Generate and Configure Release
         run: cmake . \
           --preset=Release \
@@ -58,4 +58,9 @@ jobs:
       - name: Build Release
         run: cmake --build build/Release
       - name: Test Release
-        run: ./build/Release/MotionDetectionTests --gtest_output=xml
+        run: ./build/Release/MotionDetectionTests --gtest_output=xml:test_detail_release.xml
+      - name: Test Summary
+        uses: test-summary/action@v2
+        with:
+          paths: "test_detail_*.xml"
+        if: always()
