@@ -16,9 +16,17 @@ jobs:
 
   build_and_test:
     name: Build and Test (Linux)
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ amd64, arm64 ]
+        include:
+          - arch: amd64
+            os: ubuntu-24.04
+          - arch: arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
     container:
-      image: ${{ vars.DOCKERHUB_USERNAME }}/opencv-cmake:dev
+      image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - name: Get VCPKG
@@ -56,18 +64,26 @@ jobs:
       - name: Test Release
         run: ./build/Release/tests/MotionDetectionTests --gtest_output=xml
       - name: Pack
-        run: cd build/Release && cpack -G DEB  -DCPACK_DEBIAN_FILE_NAME=motion-detection.deb
+        run: cd build/Release && cpack -G DEB  -DCPACK_DEBIAN_FILE_NAME=motion-detection-${{ matrix.arch }}.deb
       - name: Upload .deb Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: motion-detection-deb
-          path: build/Release/motion-detection.deb
+          name: motion-detection-deb-${{ matrix.arch }}
+          path: build/Release/motion-detection-${{ matrix.arch }}.deb
           if-no-files-found: error
 
   build_and_upload_image:
     name: Build and Upload Docker Image (Linux)
     needs: build_and_test
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [ amd64, arm64 ]
+        include:
+          - arch: amd64
+            os: ubuntu-24.04
+          - arch: arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     steps:
       - uses: actions/checkout@v4
@@ -81,7 +97,7 @@ jobs:
       - name: Download packed build
         uses: actions/download-artifact@v4
         with:
-          name: motion-detection-deb
+          name: motion-detection-deb-${{ matrix.arch }}
           path: ${{ github.workspace }}/docker/deploy
       - run: ls -R
         if: runner.debug == '1'
@@ -90,7 +106,7 @@ jobs:
         with:
           context: .
           file: ./docker/deploy/Dockerfile
-          build-args: MOTION_DETECTION_DEB=./docker/deploy/motion-detection.deb
+          build-args: MOTION_DETECTION_DEB=./docker/deploy/motion-detection-${{ matrix.arch }}.deb
           push: true
           tags: |
               ${{ vars.DOCKERHUB_USERNAME }}/hass-motion-detection-addon:latest
