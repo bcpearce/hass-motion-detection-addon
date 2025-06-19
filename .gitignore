@@ -1,6 +1,7 @@
 *.env
 *.secrets
 build/**/*
+!.github/*
 CMakeUserPresets.json
 *vcpkg_installed*
 out/

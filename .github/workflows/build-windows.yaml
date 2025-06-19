@@ -1,0 +1,62 @@
+name: Build Project (Windows)
+
+on:
+  - push
+  - pull_request
+
+env:
+  USERNAME: bcpearce
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+  VCPKG_GIT_REF: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
+  FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
+  VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
+
+jobs:
+
+  build_and_test:
+    name: Build and Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: choco install llvm -y
+      - name: Get VCPKG
+        run: |
+            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+      - name: Add NuGet sources
+        shell: pwsh
+        run: |
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+             sources add `
+             -Source "${{ env.FEED_URL }}" `
+             -StorePasswordInClearText `
+             -Name GitHubPackages `
+             -UserName "${{ env.USERNAME }}" `
+             -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+             setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" `
+             -Source "${{ env.FEED_URL }}"
+      - name: Generate and Configure Debug
+        run: cmake . \
+          --preset=Debug \
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_CXX_COMPILER="clang++" \
+          -DCMAKE_C_COMPILER="clang"
+      - name: Build Debug
+        run: cmake --build build/Debug
+      - name: Test Debug
+        run: ./build/Debug/MotionDetectionTests --gtest_output=xml
+      - name: Generate and Configure Release
+        run: cmake . \
+          --preset=Release \
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_CXX_COMPILER="clang++" \
+          -DCMAKE_C_COMPILER="clang"
+      - name: Build Release
+        run: cmake --build build/Release
+      - name: Test Release
+        run: ./build/Release/MotionDetectionTests --gtest_output=xml
