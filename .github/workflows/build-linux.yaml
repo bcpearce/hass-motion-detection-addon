@@ -86,7 +86,7 @@ jobs:
             platform: linux/amd64
           - arch: arm64
             os: ubuntu-24.04-arm
-            platform: linux/amd64
+            platform: linux/arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -123,6 +123,7 @@ jobs:
           file: ./docker/deploy/Dockerfile
           build-args: MOTION_DETECTION_DEB=./docker/deploy/motion-detection-${{ matrix.arch }}.deb
           tags: ${{ env.DOCKER_REGISTRY_IMAGE }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
       - name: Export digest
         run: |
           mkdir -p ${{ runner.temp }}/digests

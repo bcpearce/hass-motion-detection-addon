@@ -19,7 +19,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - run: choco install llvm -y
+      - run: choco upgrade llvm -y
       - name: Get VCPKG
         run: |
             git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
