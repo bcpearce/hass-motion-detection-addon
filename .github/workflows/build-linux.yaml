@@ -202,3 +202,4 @@ jobs:
         with:
           files: dpkg/*
           draft: true
+          token: ${{ secrets.GH_RELEASES_TOKEN }}
