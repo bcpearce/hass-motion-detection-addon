@@ -42,7 +42,9 @@ jobs:
       - name: Generate and Configure Debug
         run: cmake . \
           --preset=Debug \
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_CXX_COMPILER="cl.exe" \
+          -DCMAKE_C_COMPILER="cl.exe"
       - name: Build Debug
         run: cmake --build build/Debug
       - name: Test Debug
@@ -50,7 +52,9 @@ jobs:
       - name: Generate and Configure Release
         run: cmake . \
           --preset=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_CXX_COMPILER="cl.exe" \
+          -DCMAKE_C_COMPILER="cl.exe"
       - name: Build Release
         run: cmake --build build/Release
       - name: Test Release
