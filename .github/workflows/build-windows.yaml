@@ -19,8 +19,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install LLVM (Clang) 20
-        run: choco install llvm --version=20.1.4
       - name: Get VCPKG
         run: |
             git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
@@ -44,9 +42,7 @@ jobs:
       - name: Generate and Configure Debug
         run: cmake . \
           --preset=Debug \
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
-          -DCMAKE_CXX_COMPILER="clang++" \
-          -DCMAKE_C_COMPILER="clang"
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
       - name: Build Debug
         run: cmake --build build/Debug
       - name: Test Debug
@@ -54,9 +50,7 @@ jobs:
       - name: Generate and Configure Release
         run: cmake . \
           --preset=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
-          -DCMAKE_CXX_COMPILER="clang++" \
-          -DCMAKE_C_COMPILER="clang"
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
       - name: Build Release
         run: cmake --build build/Release
       - name: Test Release
