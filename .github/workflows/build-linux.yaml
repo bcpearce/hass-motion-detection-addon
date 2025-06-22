@@ -1,4 +1,4 @@
-name: Build Project (Linux)
+name: "Build Project (Linux)"
 
 on:
   - push
@@ -185,3 +185,20 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.DOCKER_REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+
+  release-debian:
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: dpkg
+          pattern: motion-detection-deb-*
+          run-id: ${{ github.event.workflow_run.id }}
+          merge-multiple: true
+      - name: Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dpkg/*
+          draft: true
