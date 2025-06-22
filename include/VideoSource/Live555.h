@@ -28,6 +28,7 @@ public:
 
   void InitStream() override;
   void StopStream() override;
+  [[nodiscard]] bool IsActive() override { return eventLoopWatchVar_ == 0; }
 
   const boost::url &GetUrl() const { return url_; };
 
@@ -39,7 +40,7 @@ private:
   std::unique_ptr<FrameRtspClient> pRtspClient_;
   TaskScheduler *pScheduler_{nullptr};
   UsageEnvironment *pEnv_{nullptr};
-  EventLoopWatchVariable eventLoopWatchVar_{0};
+  EventLoopWatchVariable eventLoopWatchVar_{1};
 
   std::jthread eventLoopThread_;
 };

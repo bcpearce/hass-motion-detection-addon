@@ -23,6 +23,7 @@ public:
 
   virtual void InitStream() = 0;
   virtual void StopStream() = 0;
+  [[nodiscard]] virtual bool IsActive() = 0;
   [[nodiscard]] Frame GetCurrentFrame() { return frame_; };
   [[nodiscard]] double GetFramesPerSecond() const;
 
