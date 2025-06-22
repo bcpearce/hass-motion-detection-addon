@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install LLVM (Clang) 19
-        run: choco install llvm --version=19.0.0
+        run: choco install llvm --version=20.1.4
       - name: Get VCPKG
         run: |
             git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
