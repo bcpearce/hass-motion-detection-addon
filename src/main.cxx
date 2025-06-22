@@ -123,7 +123,7 @@ void App(const util::ProgramOptions &opts) {
 #else
   std::signal(SIGINT, SignalHandler);
   std::signal(SIGTERM, SignalHandler);
-  while (!gExitFlag) {
+  while (!gExitFlag && pSource->IsActive()) {
     std::this_thread::sleep_for(1s);
   }
 #endif

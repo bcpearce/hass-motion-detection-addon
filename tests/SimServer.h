@@ -22,7 +22,7 @@ public:
   static void Stop();
   static const boost::url &GetBaseUrl();
 
-  explicit SimServer(Token, int port);
+  SimServer(Token, int port);
   ~SimServer() noexcept = default;
 
   static int GetHassApiCount();

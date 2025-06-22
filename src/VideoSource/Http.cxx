@@ -1,3 +1,5 @@
+#include "Logger.h"
+
 #include "VideoSource/Http.h"
 
 #include <chrono>
@@ -36,13 +38,20 @@ HttpVideoSource::HttpVideoSource(const boost::url &url,
 }
 
 void HttpVideoSource::InitStream() {
+  isActive_ = true;
   eventLoopThread_ = std::jthread([this](std::stop_token stopToken) {
 #ifdef _WIN32
     SetThreadDescription(GetCurrentThread(), L"Live555 Stream Thread");
 #endif
     while (!stopToken.stop_requested()) {
-      GetNextFrame();
+      try {
+        GetNextFrame();
+      } catch (const std::exception &e) {
+        LOGGER->error(e.what());
+        break;
+      }
     }
+    isActive_ = false;
   });
 }
 
@@ -63,7 +72,7 @@ Frame HttpVideoSource::GetNextFrame() {
       wCurl_(curl_easy_getinfo, CURLINFO_RESPONSE_CODE, &code);
 
       if (code == 200) {
-        // Good case, expect and image
+        // Good case, expect an image
         auto frame = GetCurrentFrame();
         cv::imdecode(buf_, cv::IMREAD_COLOR, &frame.img);
         ++frame.id;

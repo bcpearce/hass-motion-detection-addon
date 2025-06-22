@@ -25,6 +25,7 @@ public:
 
   void InitStream() override;
   void StopStream() override;
+  [[nodiscard]] bool IsActive() override { return isActive_.load(); }
 
   Frame GetNextFrame();
 
@@ -35,6 +36,7 @@ private:
   std::vector<char> buf_;
   util::CurlWrapper wCurl_;
   std::array<char, CURL_ERROR_SIZE> errBuf_;
+  std::atomic_bool isActive_{false};
 
   std::jthread eventLoopThread_;
 };
