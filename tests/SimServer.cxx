@@ -9,6 +9,9 @@
 #include <filesystem>
 #include <format>
 
+using namespace std::string_literals;
+using namespace std::string_view_literals;
+
 namespace {
 
 using json = nlohmann::json;
@@ -63,11 +66,25 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
           std::string_view(pass.data()) ==
               std::string_view(sim_token::bearer)) {
         json responseObj;
-        responseObj["entity_id"] =
-            std::string(entity_id[0].buf, entity_id[0].len);
-        responseObj["state"] = "on";
-        responseObj["attributes"] = {};
-        mg_http_reply(c, 200, "", responseObj.dump().c_str());
+
+        const std::string entityIdStr(entity_id[0].buf, entity_id[0].len);
+        if (entityIdStr.ends_with(".missing"sv) &&
+            mg_match(hm->message, mg_str("GET"), nullptr)) {
+          // special case, respond that the entity is missing, and only for GET
+          // requests Post requests should still respond with data
+          responseObj["message"] = "Entity not Found"s;
+          mg_http_reply(c, 404, "", responseObj.dump().c_str());
+        } else if (entityIdStr.starts_with("binary_sensor.")) {
+          responseObj["entity_id"] = entityIdStr;
+          responseObj["state"] = "on";
+          responseObj["attributes"] = {};
+          mg_http_reply(c, 200, "", responseObj.dump().c_str());
+        } else if (entityIdStr.starts_with("sensor.")) {
+          responseObj["entity_id"] = entityIdStr;
+          responseObj["state"] = "3";
+          responseObj["attributes"] = {};
+          mg_http_reply(c, 200, "", responseObj.dump().c_str());
+        }
       } else {
         mg_http_reply(c, 401, "", "%s", "401: Unauthorized");
       }

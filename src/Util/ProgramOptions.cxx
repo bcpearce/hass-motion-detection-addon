@@ -77,6 +77,9 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
         if (envVar == "PASSWORD"sv) {
           return "source-password"s;
         }
+        if (envVar == "TOKEN"sv) {
+          return "source-token"s;
+        }
         if (envVar == "URL"sv) {
           return "source-url"s;
         }

@@ -93,8 +93,22 @@ void WebHandler::Stop() { listenerThread_ = {}; }
 const boost::url &WebHandler::GetUrl() const noexcept { return url_; }
 
 void WebHandler::operator()(Payload data) {
-  cv::cvtColor(data.frame.img, imageBgr_, cv::COLOR_GRAY2BGR);
-  cv::cvtColor(data.detail, modelBgr_, cv::COLOR_GRAY2BGR);
+  switch (data.frame.img.channels()) {
+  case 1:
+    cv::cvtColor(data.frame.img, imageBgr_, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(data.detail, modelBgr_, cv::COLOR_GRAY2BGR);
+    break;
+  case 3:
+    data.frame.img.copyTo(imageBgr_);
+    data.detail.copyTo(modelBgr_);
+    break;
+  case 4:
+    cv::cvtColor(data.frame.img, imageBgr_, cv::COLOR_BGRA2BGR);
+    cv::cvtColor(data.detail, modelBgr_, cv::COLOR_BGRA2BGR);
+    break;
+  default:
+    throw std::invalid_argument("Frame must be BGR, BGRA, or Monochrome");
+  }
 
   for (const auto &bbox : data.rois) {
     cv::rectangle(imageBgr_, bbox, cv::Scalar(0x00, 0xFF, 0x00), 1);

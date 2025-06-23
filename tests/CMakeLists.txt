@@ -12,11 +12,12 @@ add_executable(MotionDetectionTests
   TestProgramOptions.cxx
   TestMotionDetector.cxx
   TestVideoSource.cxx
-)
+  TestWebHandler.cxx)
 
 target_link_libraries(
   MotionDetectionTests PRIVATE
   Detector
+  Gui
   HomeAssistant
   nlohmann_json::nlohmann_json
   unofficial::mongoose::mongoose
