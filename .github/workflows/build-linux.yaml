@@ -189,6 +189,7 @@ jobs:
   release-debian:
     runs-on: ubuntu-latest
     needs: build_and_test
+    if: ${{ github.ref_type == 'tag' }}
     steps:
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
