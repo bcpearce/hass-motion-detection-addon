@@ -1,0 +1,20 @@
+name: Add-on
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check_addons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find add-on directories
+        uses: home-assistant/actions/helpers/find-addons@master
+        id: find-addons
+      - name: Check Addon Was Found
+        if: ${{ contains(steps.find-addons.outputs.addons, 'Motion Detection Add-On') }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setFailed("Did not detect the addond")
