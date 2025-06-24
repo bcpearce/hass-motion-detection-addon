@@ -39,20 +39,21 @@ HttpVideoSource::HttpVideoSource(const boost::url &url,
 
 void HttpVideoSource::InitStream() {
   isActive_ = true;
-  eventLoopThread_ = std::jthread([this](std::stop_token stopToken) {
+  eventLoopThread_ =
+      std::jthread([this, url = url_](std::stop_token stopToken) {
 #ifdef _WIN32
-    SetThreadDescription(GetCurrentThread(), L"Live555 Stream Thread");
+        SetThreadDescription(GetCurrentThread(), L"HTTP Stream Thread");
 #endif
-    while (!stopToken.stop_requested()) {
-      try {
-        GetNextFrame();
-      } catch (const std::exception &e) {
-        LOGGER->error(e.what());
-        break;
-      }
-    }
-    isActive_ = false;
-  });
+        while (!stopToken.stop_requested()) {
+          try {
+            GetNextFrame();
+          } catch (const std::exception &e) {
+            LOGGER->error("Error getting frame from {}: {}", url, e.what());
+          }
+          std::this_thread::sleep_for(delayBetweenFrames);
+        }
+        isActive_ = false;
+      });
 }
 
 void HttpVideoSource::StopStream() {

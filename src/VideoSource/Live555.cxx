@@ -297,8 +297,10 @@ Live555VideoSource::Live555VideoSource(const boost::url &url,
                                        std::string_view username,
                                        std::string_view password)
     : url_{url} {
-  url_.set_user(username);
-  url_.set_password(password);
+  if (!username.empty() && !password.empty()) {
+    url_.set_user(username);
+    url_.set_password(password);
+  }
 }
 
 Live555VideoSource::~Live555VideoSource() {

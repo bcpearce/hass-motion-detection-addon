@@ -36,7 +36,7 @@ endif()
 
 project(MotionDetection
     DESCRIPTION "Motion detection for video feeds"
-    VERSION "0.4.0"
+    VERSION "0.5.0"
 )
 add_compile_definitions(MOTION_DETECTION_SEMVER="${PROJECT_VERSION}")
 add_compile_definitions(PROJECT_NAME="${PROJECT_NAME}")

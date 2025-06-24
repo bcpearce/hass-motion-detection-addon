@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <memory>
 #include <shared_mutex>
+#include <string_view>
 #include <thread>
 
 #include <boost/url.hpp>

@@ -32,7 +32,13 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
                          std::string_view entityId)
     : url_{url}, token_{token} {
 
-  url_.set_path(std::format("/api/states/{}", entityId));
+  if (std::string_view(url_.host().c_str()) == "supervisor"sv) {
+    url_.set_path(std::format("/core/api/states/{}", entityId));
+    LOGGER->info("Supervisor detected, setting URL to {}", url_);
+  } else {
+    url_.set_path(std::format("/api/states/{}", entityId));
+    LOGGER->info("Setting URL to {}", url_);
+  }
 
   util::CurlWrapper wCurl;
   wCurl(curl_easy_setopt, CURLOPT_URL, url_.c_str());
@@ -54,6 +60,16 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
       currentState_["attributes"] = tmpState["attributes"];
       nextState_ = currentState_;
     } break;
+    case 404:
+      // Not found, entity will be created upon post
+      LOGGER->warn(
+          "Entity with ID {} was not found, will be created upon first POST",
+          entityId);
+      currentState_["state"] = "unknown";
+      currentState_["entity_id"] = entityId;
+      currentState_["attributes"] = {};
+      nextState_ = currentState_;
+      break;
     default: {
       char *ct{nullptr};
       wCurl(curl_easy_getinfo, CURLINFO_CONTENT_TYPE, &ct);
@@ -64,15 +80,15 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
             ctVw.starts_with("text"))
           contentTypeDesc = std::string_view(buf_.data(), buf_.size());
       }
-      throw std::runtime_error(
-          std::format("Failed get base status of entity {} with code {}: {}",
-                      entityId, code, contentTypeDesc));
+      throw std::runtime_error(std::format(
+          "Failed get base status of entity {} at {} with code {}: {}",
+          url_.c_str(), entityId, code, contentTypeDesc));
     }
     }
   }
 
-  updaterThread_ = std::jthread([this, wCurl = std::move(wCurl)](
-                                    std::stop_token stopToken) mutable {
+  updaterThread_ = std::jthread([this, wCurl = std::move(wCurl),
+                                 entityId](std::stop_token stopToken) mutable {
 #ifdef _WIN32
     SetThreadDescription(GetCurrentThread(),
                          L"Home Assistant Handler Sensor Update Thread");
@@ -128,8 +144,8 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
                  ctVw.starts_with("text"))
                     ? std::string_view(buf_.data(), buf_.size())
                     : ""sv;
-            LOGGER->error("Failed to update status with code {}: {}", code,
-                          contentTypeDesc);
+            LOGGER->error("Failed to update entity {} status with code {}: {}",
+                          entityId, code, contentTypeDesc);
           } break;
           }
         } catch (const std::exception &e) {

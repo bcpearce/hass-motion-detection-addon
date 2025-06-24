@@ -1,0 +1,28 @@
+name: "Motion Detection Add-On"
+description: "Add motion detection sensors to RTSP feeds"
+version: "0.0.11"
+slug: "motion_detection_addon"
+init: false
+arch:
+  - amd64
+  - aarch64
+url: https://github.com/bcpearce/hass-motion-detection-addon
+webui: "http://[HOST]:[PORT:32834]/"
+host_network: true
+homeassistant_api: true
+icon: mdi:motion-sensor
+options:
+  url: null
+  entity_id: "binary_sensor.motion_detected"
+
+schema:
+  url: url
+  username: str?
+  password: password? #pragma: allowlist secret
+  token: password?
+  entity_id: str
+  detection_debounce_seconds: int(,3600)?
+  detection_size: str?
+
+environment:
+  HASS_URL: http://supervisor

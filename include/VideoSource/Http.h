@@ -30,6 +30,7 @@ public:
   Frame GetNextFrame();
 
   std::chrono::duration<long> timeout{5};
+  std::chrono::milliseconds delayBetweenFrames{2'000};
 
 private:
   boost::url url_;

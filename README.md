@@ -1,5 +1,9 @@
 # Home Assistant Motion Detection Add-On
 
+<img src="resources/motion-sensor.svg" width="50" alt="svgwalking"> <img src="resources/motion-sensor-off.svg" width="50" alt="svgwalking">
+
+---
+
 Add-On for Home Assistant that provides motion detection capabilities using various cameras and sensors.
 
 ## Features
