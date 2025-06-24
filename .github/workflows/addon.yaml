@@ -1,0 +1,17 @@
+name: Add-on
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check_addons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find add-on directories
+        uses: home-assistant/actions/helpers/find-addons@master
+        id: find-addons
+      - name: Fail if Addon was not found
+        if: ${{ !contains(steps.find-addons.outputs.addons, 'motion_detection_addon') }}
+        run: exit 1
