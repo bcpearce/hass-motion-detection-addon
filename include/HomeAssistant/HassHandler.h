@@ -32,11 +32,17 @@ public:
   HassHandler &operator=(const HassHandler &) = delete;
   HassHandler &operator=(HassHandler &&) = delete;
 
+  void Start();
+  void Stop();
+
   virtual ~HassHandler() noexcept = default;
 
   virtual void
   operator()(std::optional<detector::RegionsOfInterest> rois = {}) = 0;
+
   std::chrono::duration<double> debounceTime{30.0};
+  std::string friendlyName;
+  std::string entityId;
 
 protected:
   void UpdateState(std::string_view state, const json &attributes = {});

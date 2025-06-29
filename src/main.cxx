@@ -50,9 +50,6 @@ void SignalHandler(int signal) {
 
 void App(const util::ProgramOptions &opts) {
 
-  auto stdoutLogger = logger::InitStderrLogger();
-  auto stderrLogger = logger::InitStdoutLogger();
-
   std::shared_ptr<video_source::VideoSource> pSource{nullptr};
   if (opts.url.scheme() == "http"sv || opts.url.scheme() == "https"sv) {
     pSource = std::make_shared<video_source::HttpVideoSource>(
@@ -90,11 +87,13 @@ void App(const util::ProgramOptions &opts) {
                  opts.hassEntityId, opts.hassUrl);
     pHassHandler = home_assistant::HassHandler::Create(
         opts.hassUrl, opts.hassToken, opts.hassEntityId);
+    pHassHandler->friendlyName = opts.hassFriendlyName;
     auto onMotionDetectionCallbackHass =
         [pHassHandler](detector::Payload data) {
           pHassHandler->operator()(data.rois);
         };
     pDetector->Subscribe(onMotionDetectionCallbackHass);
+    pHassHandler->Start();
   }
 
 #ifdef USE_GRAPHICAL_USER_INTERFACE
@@ -133,6 +132,8 @@ void App(const util::ProgramOptions &opts) {
 
 int main(int argc, const char **argv) {
   try {
+    auto stdoutLogger = logger::InitStderrLogger();
+    auto stderrLogger = logger::InitStdoutLogger();
     const util::ProgramOptions opts(argc, argv, true);
     App(opts);
   } catch (const std::exception &e) {

@@ -19,6 +19,7 @@ TEST_P(TestHassHandler, CanPostBinarySensorUpdate) {
     auto binarySensor = home_assistant::HassHandler::Create(
         SimServer::GetBaseUrl(), sim_token::bearer, entityId);
     binarySensor->debounceTime = 0s;
+    binarySensor->Start();
 
     (*binarySensor)({});
     std::vector rois = {cv::Rect(50, 50, 50, 50)};
@@ -31,8 +32,9 @@ TEST_P(TestHassHandler, CanPostBinarySensorUpdate) {
 TEST_P(TestHassHandler, FailsWithoutBearerToken) {
   const int startApiCalls = SimServer::GetHassApiCount();
   EXPECT_THROW(std::invoke([entityId = GetParam()] {
-                 std::ignore = home_assistant::HassHandler::Create(
+                 auto binarySensor = home_assistant::HassHandler::Create(
                      SimServer::GetBaseUrl(), "invalid_token", entityId);
+                 binarySensor->Start();
                }),
                std::runtime_error);
 }

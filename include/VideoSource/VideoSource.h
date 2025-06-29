@@ -28,6 +28,7 @@ public:
   [[nodiscard]] double GetFramesPerSecond() const;
 
   double fpsAlpha{0.1};
+  bool fullColor{false};
 
 protected:
   void SetFrame(Frame frame);

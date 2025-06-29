@@ -19,6 +19,7 @@ struct ProgramOptions {
 
   boost::url hassUrl{""};
   std::string hassEntityId;
+  std::string hassFriendlyName;
   std::string hassToken;
 
   std::string webUiHost{"0.0.0.0"};
