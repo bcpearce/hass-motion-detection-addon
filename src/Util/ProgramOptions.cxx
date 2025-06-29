@@ -39,6 +39,10 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
   desc.add_options()("hass-entity-id",
                      po::value<std::string>()->default_value(""),
                      "Home Assistant entity ID to update");
+  desc.add_options()("hass-friendly-name",
+                     po::value<std::string>()->default_value(""),
+                     "Home Assistant entity Friendly Name (to be sent if the "
+                     "entity ID does not already exist)");
   desc.add_options()("hass-token", po::value<std::string>()->default_value(""),
                      "Home Assistant long-lived access token for API auth");
 
@@ -89,6 +93,9 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
         if (envVar == "HASS_ENTITY_ID"sv) {
           return "hass-entity-id"s;
         }
+        if (envVar == "HASS_FRIENDLY_NAME"sv) {
+          return "hass-friendly-name"s;
+        }
         if (envVar == "HASS_TOKEN"sv) {
           return "hass-token"s;
         }
@@ -124,6 +131,7 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
     password = vm["source-password"].as<std::string>();
     hassUrl = boost::url(vm["hass-url"].as<std::string>());
     hassEntityId = vm["hass-entity-id"].as<std::string>();
+    hassFriendlyName = vm["hass-friendly-name"].as<std::string>();
     hassToken = vm["hass-token"].as<std::string>();
     webUiHost = vm["web-ui-host"].as<std::string>();
     webUiPort = vm["web-ui-port"].as<int>();
@@ -140,9 +148,8 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
         detectionSize = std::stoi(raw);
       }
     }
-    if (vm.count("detection-debounce")) {
-      detectionDebounce =
-          std::chrono::seconds{vm["detection-debounce"].as<int>()};
+    if (auto it = vm.find("detection-debounce"); it != vm.end()) {
+      detectionDebounce = std::chrono::seconds{it->second.as<int>()};
     }
   } catch (const std::exception &e) {
     std::cout << e.what() << "\n";

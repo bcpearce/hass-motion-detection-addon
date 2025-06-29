@@ -5,6 +5,7 @@
 #include <chrono>
 #include <format>
 #include <iostream>
+#include <string_view>
 
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
@@ -30,7 +31,9 @@ home_assistant::HassHandler::Create(const boost::url &url,
 
 HassHandler::HassHandler(const boost::url &url, const std::string &token,
                          std::string_view entityId)
-    : url_{url}, token_{token} {
+    : url_{url}, token_{token}, entityId{entityId} {}
+
+void HassHandler::Start() {
 
   if (std::string_view(url_.host().c_str()) == "supervisor"sv) {
     url_.set_path(std::format("/core/api/states/{}", entityId));
@@ -87,8 +90,12 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
     }
   }
 
-  updaterThread_ = std::jthread([this, wCurl = std::move(wCurl),
-                                 entityId](std::stop_token stopToken) mutable {
+  if (!friendlyName.empty()) {
+    currentState_["attributes"]["friendly_name"] = friendlyName;
+  }
+
+  updaterThread_ = std::jthread([this, wCurl = std::move(wCurl)](
+                                    std::stop_token stopToken) mutable {
 #ifdef _WIN32
     SetThreadDescription(GetCurrentThread(),
                          L"Home Assistant Handler Sensor Update Thread");
@@ -155,11 +162,12 @@ HassHandler::HassHandler(const boost::url &url, const std::string &token,
     } while (!stopToken.stop_requested());
   });
 }
+void HassHandler::Stop() { updaterThread_ = {}; }
 
 void HassHandler::UpdateState(std::string_view state, const json &attributes) {
   std::unique_lock lk(mtx_);
   nextState_["state"] = state;
-  nextState_["attributes"]["rois"] = attributes;
+  nextState_["attributes"] = attributes;
   cv_.notify_all();
 }
 
@@ -186,6 +194,7 @@ void BinarySensorHandler::operator()(
                                          })
                                          .value_or("unknown"sv);
   json attributes;
+  attributes["device_class"] = "motion";
   for (const auto &roi : rois.value_or(detector::RegionsOfInterest{})) {
     json roiJson;
     to_json(roiJson, roi);

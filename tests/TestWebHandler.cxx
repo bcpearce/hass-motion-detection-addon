@@ -18,7 +18,7 @@ TEST_P(WebHandlerTests, CanSetImage) {
 
   using sc = std::chrono::steady_clock;
 
-  data.frame = {.id{0},
+  data.frame = {.id = 0,
                 .img = cv::Mat::zeros(400, 400, matType),
                 .timeStamp = sc::time_point::min()};
   data.detail = cv::Mat::zeros(400, 400, matType);

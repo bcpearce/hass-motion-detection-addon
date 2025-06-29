@@ -346,33 +346,40 @@ void Live555VideoSource::StopStream() {
   eventLoopThread_ = {};
 }
 
-#define FULL_COLOR 0
-
 void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
                                      int strideY, int strideUV, int timeStamp) {
-  const cv::Mat Y(cv::Size(width, height), CV_8UC1, pDataYUV[0], strideY);
 
-#if FULL_COLOR
-  const cv::Mat U2(cv::Size(width / 2, height / 2), CV_8UC1, pDataYUV[1],
-                   strideUV);
-  const cv::Mat V2(cv::Size(width / 2, height / 2), CV_8UC1, pDataYUV[2],
-                   strideUV);
+  thread_local cv::Mat Y, U, V, YUV;
+  Y = cv::Mat(cv::Size(width, height), CV_8UC1, pDataYUV[0],
+              strideY); // non-owning buffer, set to thread local to persist
+                        // outside scope
 
-  thread_local cv::Mat U, V, YUV;
-  cv::resize(U2, U, Y.size());
-  cv::resize(V2, V, Y.size());
-#endif
+  if (this->fullColor) {
+    const cv::Mat U2(cv::Size(width / 2, height / 2), CV_8UC1, pDataYUV[1],
+                     strideUV);
+    const cv::Mat V2(cv::Size(width / 2, height / 2), CV_8UC1, pDataYUV[2],
+                     strideUV);
+
+    thread_local cv::Mat U, V, YUV;
+    cv::resize(U2, U, Y.size());
+    cv::resize(V2, V, Y.size());
+  } else {
+    U = cv::Mat();
+    V = cv::Mat();
+    YUV = cv::Mat();
+  }
 
   try {
     auto frame = GetCurrentFrame();
-#if FULL_COLOR
-    cv::merge(std::array{Y, U, V}, YUV);
-    cv::cvtColor(YUV, frame.img, cv::COLOR_YUV2BGR);
-#else
-    if (!Y.empty()) {
-      Y.copyTo(frame.img);
+
+    if (this->fullColor) {
+      cv::merge(std::array{Y, U, V}, YUV);
+      cv::cvtColor(YUV, frame.img, cv::COLOR_YUV2BGR);
+    } else {
+      if (!Y.empty()) {
+        frame.img = Y;
+      }
     }
-#endif
     ++frame.id;
     frame.timeStamp = std::chrono::steady_clock::now();
     this->SetFrame(frame);
@@ -667,6 +674,7 @@ void shutdownStream(RTSPClient *rtspClient) {
   }
 
   LOGGER->info("{} Closing the stream.", *rtspClient);
+  client->RequestStop();
   Medium::close(rtspClient);
   // Note that this will also cause this stream's "StreamClientState"
   // structure to get reclaimed.
