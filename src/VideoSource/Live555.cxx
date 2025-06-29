@@ -364,9 +364,9 @@ void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
     cv::resize(U2, U, Y.size());
     cv::resize(V2, V, Y.size());
   } else {
-    U = {};
-    V = {};
-    YUV = {};
+    U = cv::Mat();
+    V = cv::Mat();
+    YUV = cv::Mat();
   }
 
   try {

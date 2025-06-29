@@ -5,6 +5,7 @@
 #include <chrono>
 #include <format>
 #include <iostream>
+#include <string_view>
 
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
