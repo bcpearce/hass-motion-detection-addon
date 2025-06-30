@@ -5,7 +5,13 @@
     "curl",
     "live555",
     "ms-gsl",
-    "mongoose",
+    {
+      "name": "mongoose",
+      "features": [
+        "pack",
+        "ssl"
+      ]
+    },
     {
       "name": "opencv4",
       "default-features": false,

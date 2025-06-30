@@ -96,21 +96,25 @@ if (USE_GRAPHICAL_USER_INTERFACE)
     opencv_highgui
   )
 else()
-  add_subdirectory(src/Gui)
   add_library(Gui SHARED
-    src/Gui/public/index.html
     src/Gui/WebHandler.cxx
     include/Gui/WebHandler.h
-    include/index.h
+    "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
   )
-  file(GLOB_RECURSE GUI_PUBLIC_FILES "src/Gui/public/*")
-  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/public)
-  add_custom_command(
-      TARGET Gui POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${GUI_PUBLIC_FILES}
-        ${CMAKE_CURRENT_BINARY_DIR}/public/
+
+  option(HOT_RELOAD_WEB_UI "Enable hot-reload of the Web UI" OFF)
+  if (HOT_RELOAD_WEB_UI)
+    target_compile_definitions(Gui PRIVATE SERVE_UNPACKED)
+  endif()
+
+  file(GLOB_RECURSE GUI_PUBLIC_FILES RELATIVE "${CMAKE_SOURCE_DIR}/src/Gui/" "src/Gui/public/*" )
+  file(GLOB_RECURSE GUI_PUBLIC_FILES_ABS "${CMAKE_SOURCE_DIR}/src/Gui/public/*" )
+  add_custom_command(OUTPUT packed_fs.c
+    COMMAND unofficial::mongoose::pack ${GUI_PUBLIC_FILES} > "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/Gui"
+    DEPENDS ${GUI_PUBLIC_FILES_ABS}
   )
+
   find_package(unofficial-mongoose REQUIRED)
   target_link_libraries(Gui PUBLIC
     Detector
@@ -202,11 +206,6 @@ install(TARGETS Detector Gui HomeAssistant Util VideoSource
   ARCHIVE DESTINATION lib/${PROJECT_NAME}
 )
 install(FILES LICENSE DESTINATION share/licenses/${PROJECT_NAME})
-install(DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/public DESTINATION share/${PROJECT_NAME}
-    FILE_PERMISSIONS WORLD_READ
-    DIRECTORY_PERMISSIONS WORLD_READ
-)
 
 option(PACK_PROJECT "Package the project for distribution" ON)
 if (PACK_PROJECT)

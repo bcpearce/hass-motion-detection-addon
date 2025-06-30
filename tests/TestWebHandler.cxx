@@ -1,9 +1,14 @@
 #include "WindowsWrapper.h"
 
+#include <filesystem>
+#include <fstream>
+
 #include <gtest/gtest.h>
 
 #include "Gui/Payload.h"
 #include "Gui/WebHandler.h"
+#include "Util/BufferOperations.h"
+#include "Util/CurlWrapper.h"
 
 class WebHandlerTests : public testing::TestWithParam<int> {};
 
@@ -30,3 +35,33 @@ TEST_P(WebHandlerTests, CanSetImage) {
 
 INSTANTIATE_TEST_SUITE_P(ImageTypes, WebHandlerTests,
                          testing::Values(CV_8UC1, CV_8UC3, CV_8UC4));
+
+TEST(FilesystemTest, CanAccessPackedFilesystem) {
+  gui::WebHandler wh(32836);
+  wh.Start();
+
+  // read the packed index.html to compare later
+  const auto indexPath =
+      std::filesystem::path(__FILE__).parent_path().parent_path() / "src" /
+      "Gui" / "public" / "index.html";
+
+  std::ifstream fs(indexPath, std::ios::binary | std::ios::ate);
+  std::streamsize sz = fs.tellg();
+  std::vector<char> expected(sz);
+  fs.seekg(0, std::ios::beg);
+  ASSERT_TRUE(fs.read(expected.data(), sz))
+      << "Failed to read file at " << indexPath.string();
+
+  util::CurlWrapper wCurl;
+  std::vector<char> buf;
+  EXPECT_NO_THROW(std::invoke([&] {
+    wCurl(curl_easy_setopt, CURLOPT_URL, "http://localhost:32836/");
+    wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
+    wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
+    wCurl(curl_easy_perform);
+  }));
+
+  EXPECT_EQ(buf, expected);
+
+  wh.Stop();
+}
