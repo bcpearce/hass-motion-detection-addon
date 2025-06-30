@@ -87,7 +87,10 @@ void App(const util::ProgramOptions &opts) {
                  opts.hassEntityId, opts.hassUrl);
     pHassHandler = home_assistant::HassHandler::Create(
         opts.hassUrl, opts.hassToken, opts.hassEntityId);
+
     pHassHandler->friendlyName = opts.hassFriendlyName;
+    pHassHandler->debounceTime = opts.detectionDebounce;
+
     auto onMotionDetectionCallbackHass =
         [pHassHandler](detector::Payload data) {
           pHassHandler->operator()(data.rois);

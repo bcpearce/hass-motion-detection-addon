@@ -25,7 +25,7 @@ if (BUILD_TESTS)
 endif()
 
 if(WIN32)
-    add_compile_definitions("_WIN32_WINNT=0x0601") # Windows 7
+    add_compile_definitions("_WIN32_WINNT=0x0601" "_HAS_CXX17=1") # Windows 7
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
