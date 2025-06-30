@@ -90,10 +90,6 @@ void HassHandler::Start() {
     }
   }
 
-  if (!friendlyName.empty()) {
-    currentState_["attributes"]["friendly_name"] = friendlyName;
-  }
-
   updaterThread_ = std::jthread([this, wCurl = std::move(wCurl)](
                                     std::stop_token stopToken) mutable {
 #ifdef _WIN32
@@ -121,7 +117,7 @@ void HassHandler::Start() {
       const bool stateChanging = nextState_ != currentState_;
       const bool debounce = (sc::now() - lastStateUpdate > debounceTime);
 
-      if (stateChanging && debounce) {
+      if ((stateChanging && debounce) || nextState_["state"] == "unknown"sv) {
 
         buf_.clear();
 
@@ -138,7 +134,7 @@ void HassHandler::Start() {
             LOGGER->info("Updated {} with state {}",
                          nextState_["entity_id"].template get<std::string>(),
                          nextState_["state"].template get<std::string>());
-
+            LOGGER->info("{}", nextState_.dump(2));
             currentState_ = nextState_;
             lastStateUpdate = sc::now();
             break;
@@ -168,6 +164,9 @@ void HassHandler::UpdateState(std::string_view state, const json &attributes) {
   std::unique_lock lk(mtx_);
   nextState_["state"] = state;
   nextState_["attributes"] = attributes;
+  if (!friendlyName.empty()) {
+    nextState_["attributes"]["friendly_name"] = friendlyName;
+  }
   cv_.notify_all();
 }
 
