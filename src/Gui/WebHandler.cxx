@@ -54,8 +54,15 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
       c->data[0] = 'M';
       mg_printf(c, "%s", mjpegHeaders);
     } else {
-      // mg_http_reply(c, 200, "", "%s", web_public::indexHtml);
+
+      // Use for testing, enables "hot reload" for resources in public
+#ifdef SERVE_UNPACKED
+      const auto rootDir =
+          std::filesystem::path(__FILE__).parent_path() / "public";
+      mg_http_serve_opts opts = {.root_dir = rootDir.string().c_str()};
+#else
       mg_http_serve_opts opts = {.root_dir = "/public", .fs = &mg_fs_packed};
+#endif
       mg_http_serve_dir(c, hm, &opts);
     }
   } break;

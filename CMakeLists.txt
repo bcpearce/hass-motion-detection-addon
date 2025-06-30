@@ -101,6 +101,12 @@ else()
     include/Gui/WebHandler.h
     "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
   )
+
+  option(HOT_RELOAD_WEB_UI "Enable hot-reload of the Web UI" OFF)
+  if (HOT_RELOAD_WEB_UI)
+    target_compile_definitions(Gui PRIVATE SERVE_UNPACKED)
+  endif()
+
   file(GLOB_RECURSE GUI_PUBLIC_FILES RELATIVE "${CMAKE_SOURCE_DIR}/src/Gui/" "src/Gui/public/*" )
   file(GLOB_RECURSE GUI_PUBLIC_FILES_ABS "${CMAKE_SOURCE_DIR}/src/Gui/public/*" )
   add_custom_command(OUTPUT packed_fs.c

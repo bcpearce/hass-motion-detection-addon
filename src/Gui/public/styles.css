@@ -1,0 +1,35 @@
+:root {
+		color-scheme: light dark;
+}
+
+body {
+		font-family: sans-serif;
+		background-color: light-dark(#ffffff, #1e1e1e);
+}
+
+h1 {
+		padding-left: 30px;
+		color: light-dark(black, lightgray);
+}
+
+.image-container {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 10px;
+		padding: 10px;
+}
+
+.image-container img {
+		width: 100%;
+		max-width: 48%;
+		height: auto;
+		border-radius: 8px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 600px) {
+		.image-container img {
+				max-width: 100%;
+		}
+}
