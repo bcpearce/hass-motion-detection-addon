@@ -1,7 +1,6 @@
 #include "WindowsWrapper.h"
 
 #include "Gui/WebHandler.h"
-#include "index.h"
 
 #include <filesystem>
 #include <iostream>
@@ -55,7 +54,9 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
       c->data[0] = 'M';
       mg_printf(c, "%s", mjpegHeaders);
     } else {
-      mg_http_reply(c, 200, "", "%s", web_public::indexHtml);
+      // mg_http_reply(c, 200, "", "%s", web_public::indexHtml);
+      mg_http_serve_opts opts = {.root_dir = "/public", .fs = &mg_fs_packed};
+      mg_http_serve_dir(c, hm, &opts);
     }
   } break;
   }
