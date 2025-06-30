@@ -63,8 +63,8 @@ namespace {
 
 template <>
 struct fmt::formatter<RTSPClient> : fmt::formatter<std::string_view> {
-  auto format(const RTSPClient &rtspClient,
-              format_context &ctx) const -> decltype(ctx.out()) {
+  auto format(const RTSPClient &rtspClient, format_context &ctx) const
+      -> decltype(ctx.out()) {
     return fmt::format_to(ctx.out(), "[RTSP URL: {}]",
                           boost::url(rtspClient.url()));
   }
@@ -72,8 +72,8 @@ struct fmt::formatter<RTSPClient> : fmt::formatter<std::string_view> {
 
 template <>
 struct fmt::formatter<MediaSubsession> : fmt::formatter<std::string_view> {
-  auto format(const MediaSubsession &subsession,
-              format_context &ctx) const -> decltype(ctx.out()) {
+  auto format(const MediaSubsession &subsession, format_context &ctx) const
+      -> decltype(ctx.out()) {
     return fmt::format_to(ctx.out(), "{}/{}", subsession.mediumName(),
                           subsession.codecName());
   }

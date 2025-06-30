@@ -33,8 +33,8 @@ inline auto InitStderrLogger() {
 
 template <>
 struct fmt::formatter<boost::url> : fmt::formatter<std::string_view> {
-  auto format(boost::url url,
-              format_context &ctx) const -> decltype(ctx.out()) {
+  auto format(boost::url url, format_context &ctx) const
+      -> decltype(ctx.out()) {
     if (!url.password().empty()) {
       url.set_password("********");
     }
