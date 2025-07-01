@@ -5,6 +5,7 @@ project(mongoose C)
 include(GNUInstallDirs)
 
 option(ENABLE_SSL "Build with openssl support" OFF)
+option(ENABLE_PACK "Build pack for embedding read-only filesystems" OFF)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 

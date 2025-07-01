@@ -54,9 +54,8 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
       c->data[0] = 'M';
       mg_printf(c, "%s", mjpegHeaders);
     } else {
-
-      // Use for testing, enables "hot reload" for resources in public
 #ifdef SERVE_UNPACKED
+      // Use for testing, enables "hot reload" for resources in public folder
       const auto rootDir =
           std::filesystem::path(__FILE__).parent_path() / "public";
       mg_http_serve_opts opts = {.root_dir = rootDir.string().c_str()};
