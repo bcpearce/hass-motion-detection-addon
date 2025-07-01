@@ -18,21 +18,12 @@
 #include <spdlog/spdlog.h>
 
 #include "Detector/MotionDetector.h"
+#include "Gui/WebHandler.h"
 #include "HomeAssistant/HassHandler.h"
 #include "Util/ProgramOptions.h"
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
 #include "VideoSource/VideoSource.h"
-
-#ifdef USE_GRAPHICAL_USER_INTERFACE
-#include "Gui/GuiHandler.h"
-#include <opencv2/highgui.hpp>
-#ifdef __linux__
-#include <X11/Xlib.h>
-#endif
-#else
-#include "Gui/WebHandler.h"
-#endif
 
 using namespace std::string_view_literals;
 using namespace std::chrono_literals;
@@ -99,13 +90,9 @@ void App(const util::ProgramOptions &opts) {
     pHassHandler->Start();
   }
 
-#ifdef USE_GRAPHICAL_USER_INTERFACE
-  gui::GuiHandler gh;
-#else
   gui::WebHandler gh(opts.webUiPort, opts.webUiHost);
   LOGGER->info("Web interface started at {}", gh.GetUrl());
   gh.Start();
-#endif
   auto onMotionDetectorCallbackGui = [&gh, pDetector,
                                       pSource](detector::Payload data) {
     gh({.rois = data.rois,
@@ -117,18 +104,11 @@ void App(const util::ProgramOptions &opts) {
 
   pSource->InitStream();
 
-#ifdef USE_GRAPHICAL_USER_INTERFACE
-  do {
-    cv::imshow(gh.windowName, gh.canvas);
-  } while (cv::waitKey(33) < 0);
-  pSource->StopStream();
-#else
   std::signal(SIGINT, SignalHandler);
   std::signal(SIGTERM, SignalHandler);
   while (!gExitFlag && pSource->IsActive()) {
     std::this_thread::sleep_for(1s);
   }
-#endif
 
   (*pHassHandler)();
 }

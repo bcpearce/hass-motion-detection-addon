@@ -11,14 +11,6 @@ include_directories(AFTER "${CMAKE_BINARY_DIR}/include")
 
 set(OPENCV_MODULES "core;bgsegm;imgproc")
 
-option(USE_GRAPHICAL_USER_INTERFACE "Enable GUI backed by OpenCV's highgui module" OFF)
-if (USE_GRAPHICAL_USER_INTERFACE)
-  message(STATUS "Building with graphical user interface.")
-  list(APPEND VCPKG_MANIFEST_FEATURES "graphical-user-interface")
-  list(APPEND OPENCV_MODULES "highgui")
-  add_compile_definitions(USE_GRAPHICAL_USER_INTERFACE=1)
-endif()
-
 option(BUILD_TESTS "Build Tests" ON)
 if (BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
@@ -34,9 +26,11 @@ if (MSVC)
     add_compile_options("/external:W0 /external:anglebrackets /utf-8")
 endif()
 
+file(READ "${CMAKE_SOURCE_DIR}/VERSION" PROJECT_VERSION)
+string(STRIP ${PROJECT_VERSION} PROJECT_VERSION)
 project(MotionDetection
     DESCRIPTION "Motion detection for video feeds"
-    VERSION "0.5.0"
+    VERSION ${PROJECT_VERSION}
 )
 add_compile_definitions(MOTION_DETECTION_SEMVER="${PROJECT_VERSION}")
 add_compile_definitions(PROJECT_NAME="${PROJECT_NAME}")
@@ -49,6 +43,7 @@ find_package(Boost REQUIRED COMPONENTS
 )
 find_package(CURL REQUIRED)
 find_package(Live555 CONFIG REQUIRED)
+find_package(unofficial-mongoose REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 find_package(OpenCV REQUIRED COMPONENTS
@@ -57,7 +52,6 @@ find_package(OpenCV REQUIRED COMPONENTS
 find_package(OpenSSL CONFIG REQUIRED)
 find_package(OpenH264 REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-
 
 add_library(Detector SHARED
   src/Detector/Detector.cxx
@@ -87,41 +81,31 @@ add_library(VideoSource SHARED
   include/VideoSource/VideoSource.h
 )
 
-if (USE_GRAPHICAL_USER_INTERFACE)
-  add_library(Gui SHARED
-    src/Gui/GuiHandler.cxx
-    include/Gui/GuiHandler.h
-  )
-  target_link_libraries(Gui PUBLIC
-    opencv_highgui
-  )
-else()
-  add_library(Gui SHARED
-    src/Gui/WebHandler.cxx
-    include/Gui/WebHandler.h
-    "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
-  )
+add_library(Gui SHARED
+src/Gui/WebHandler.cxx
+include/Gui/WebHandler.h
+  "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
+)
 
-  option(HOT_RELOAD_WEB_UI "Enable hot-reload of the Web UI" OFF)
-  if (HOT_RELOAD_WEB_UI)
-    target_compile_definitions(Gui PRIVATE SERVE_UNPACKED)
-  endif()
-
-  file(GLOB_RECURSE GUI_PUBLIC_FILES RELATIVE "${CMAKE_SOURCE_DIR}/src/Gui/" "src/Gui/public/*" )
-  file(GLOB_RECURSE GUI_PUBLIC_FILES_ABS "${CMAKE_SOURCE_DIR}/src/Gui/public/*" )
-  add_custom_command(OUTPUT packed_fs.c
-    COMMAND unofficial::mongoose::pack ${GUI_PUBLIC_FILES} > "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/Gui"
-    DEPENDS ${GUI_PUBLIC_FILES_ABS}
-  )
-
-  find_package(unofficial-mongoose REQUIRED)
-  target_link_libraries(Gui PUBLIC
-    Detector
-    unofficial::mongoose::mongoose
-    VideoSource
-  )
+option(HOT_RELOAD_WEB_UI "Enable hot-reload of the Web UI" OFF)
+if (HOT_RELOAD_WEB_UI)
+  target_compile_definitions(Gui PRIVATE SERVE_UNPACKED)
 endif()
+
+file(GLOB_RECURSE GUI_PUBLIC_FILES RELATIVE "${CMAKE_SOURCE_DIR}/src/Gui/" "src/Gui/public/*" )
+file(GLOB_RECURSE GUI_PUBLIC_FILES_ABS "${CMAKE_SOURCE_DIR}/src/Gui/public/*" )
+add_custom_command(OUTPUT packed_fs.c
+  COMMAND unofficial::mongoose::pack ${GUI_PUBLIC_FILES} > "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/Gui"
+  DEPENDS ${GUI_PUBLIC_FILES_ABS}
+)
+
+target_link_libraries(Gui PUBLIC
+  Detector
+  unofficial::mongoose::mongoose
+  nlohmann_json::nlohmann_json
+  VideoSource
+)
 
 add_executable(MotionDetection
     include/Logger.h
@@ -135,7 +119,7 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/.env)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${CMAKE_SOURCE_DIR}/.env
     $<TARGET_FILE_DIR:MotionDetection>/.env
-)
+ )
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)

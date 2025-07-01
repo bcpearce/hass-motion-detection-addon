@@ -5,6 +5,7 @@
 
 #include <boost/url.hpp>
 
+#include "spdlog/sinks/callback_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
