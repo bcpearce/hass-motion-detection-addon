@@ -134,7 +134,7 @@ void HassHandler::Start() {
             LOGGER->info("Updated {} with state {}",
                          nextState_["entity_id"].template get<std::string>(),
                          nextState_["state"].template get<std::string>());
-            LOGGER->info("{}", nextState_.dump(2));
+            LOGGER->debug("{}", nextState_.dump(2));
             currentState_ = nextState_;
             lastStateUpdate = sc::now();
             break;
