@@ -14,8 +14,8 @@ public:
 class LoggerEnvironment : public ::testing::Environment {
 public:
   void SetUp() override {
-    logger::InitStderrLogger();
-    logger::InitStdoutLogger();
+    auto stdoutLogger = logger::InitStderrLogger();
+    auto stderrLogger = logger::InitStdoutLogger();
   }
 };
 
@@ -24,10 +24,10 @@ public:
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
 
-  auto *serverEnv = testing::AddGlobalTestEnvironment(
-      std::make_unique<ServerEnvironment>().release());
   auto *loggerEnv = testing::AddGlobalTestEnvironment(
       std::make_unique<LoggerEnvironment>().release());
+  auto *serverEnv = testing::AddGlobalTestEnvironment(
+      std::make_unique<ServerEnvironment>().release());
 
   return RUN_ALL_TESTS();
 }

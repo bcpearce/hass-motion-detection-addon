@@ -18,7 +18,9 @@ using json = nlohmann::json;
 
 namespace {
 
-static constexpr int broadcastId{0};
+static std::atomic_bool broadcastLogs{false};
+static struct mg_mgr *pMgr{nullptr};
+static unsigned long parentConnId{0};
 
 static constexpr const char *mjpegHeaders =
     "HTTP/1.0 200 OK\r\n"
@@ -56,6 +58,13 @@ static void BroadcastImage_TimerCallback(void *arg) {
 // HTTP server event handler function
 void EventHandler(mg_connection *c, int ev, void *ev_data) {
   switch (ev) {
+  case MG_EV_OPEN:
+    if (c->is_listening) {
+      pMgr = c->mgr;
+      parentConnId = c->id;
+      broadcastLogs = true;
+    }
+    break;
   case MG_EV_HTTP_MSG: {
     mg_http_message *hm = (mg_http_message *)ev_data;
     if (mg_match(hm->uri, mg_str("/media/live"), nullptr)) {
@@ -81,7 +90,11 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
   } break;
   case MG_EV_WAKEUP: {
     const std::string_view msg = *((std::string_view *)ev_data);
-    mg_ws_send(c, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+    for (mg_connection *wc = c->mgr->conns; wc != nullptr; wc = wc->next) {
+      if (wc->data[0] == 'W') {
+        mg_ws_send(wc, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+      }
+    }
   } break;
   }
 }
@@ -133,11 +146,8 @@ void WebHandler::Start() {
         wsMsg["timestamp"] = std::format("{}", msg.time);
         dumped = wsMsg.dump();
 
-        for (mg_connection *wc = mgr_.conns; wc != nullptr; wc = wc->next) {
-          if (wc->data[0] == 'W') {
-            const bool didWake =
-                mg_wakeup(&mgr_, wc->id, dumped.data(), dumped.size());
-          }
+        if (broadcastLogs) {
+          mg_wakeup(pMgr, parentConnId, dumped.data(), dumped.size());
         }
       });
 
