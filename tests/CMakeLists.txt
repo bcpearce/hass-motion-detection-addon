@@ -35,3 +35,6 @@ include(GoogleTest)
 gtest_discover_tests(
 	MotionDetectionTests
 )
+
+add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
+add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)

@@ -1,6 +1,6 @@
 #include "Logger.h"
 
-#include "HomeAssistant/HassHandler.h"
+#include "HomeAssistant/ThreadedHassHandler.h"
 
 #include <chrono>
 #include <format>

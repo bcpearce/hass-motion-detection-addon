@@ -19,7 +19,7 @@
 
 #include "Detector/MotionDetector.h"
 #include "Gui/WebHandler.h"
-#include "HomeAssistant/HassHandler.h"
+#include "HomeAssistant/ThreadedHassHandler.h"
 #include "Util/ProgramOptions.h"
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
