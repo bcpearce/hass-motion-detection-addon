@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "HomeAssistant/HassHandler.h"
+#include "HomeAssistant/ThreadedHassHandler.h"
 #include "SimServer.h"
 #include "Util/CurlWrapper.h"
 

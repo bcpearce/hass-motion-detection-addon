@@ -9,16 +9,6 @@ add_compile_definitions(
 
 include_directories(AFTER "${CMAKE_BINARY_DIR}/include")
 
-set(OPENCV_MODULES "core;bgsegm;imgproc")
-
-option(USE_GRAPHICAL_USER_INTERFACE "Enable GUI backed by OpenCV's highgui module" OFF)
-if (USE_GRAPHICAL_USER_INTERFACE)
-  message(STATUS "Building with graphical user interface.")
-  list(APPEND VCPKG_MANIFEST_FEATURES "graphical-user-interface")
-  list(APPEND OPENCV_MODULES "highgui")
-  add_compile_definitions(USE_GRAPHICAL_USER_INTERFACE=1)
-endif()
-
 option(BUILD_TESTS "Build Tests" ON)
 if (BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
@@ -34,94 +24,26 @@ if (MSVC)
     add_compile_options("/external:W0 /external:anglebrackets /utf-8")
 endif()
 
+file(READ "${CMAKE_SOURCE_DIR}/VERSION" PROJECT_VERSION)
+string(STRIP ${PROJECT_VERSION} PROJECT_VERSION)
 project(MotionDetection
     DESCRIPTION "Motion detection for video feeds"
-    VERSION "0.5.0"
+    VERSION ${PROJECT_VERSION}
 )
 add_compile_definitions(MOTION_DETECTION_SEMVER="${PROJECT_VERSION}")
 add_compile_definitions(PROJECT_NAME="${PROJECT_NAME}")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-find_package(Boost REQUIRED COMPONENTS
-  program_options
-  url
-)
+find_package(Boost REQUIRED COMPONENTS program_options url)
 find_package(CURL REQUIRED)
 find_package(Live555 CONFIG REQUIRED)
+find_package(unofficial-mongoose REQUIRED)
 find_package(nlohmann_json REQUIRED)
-
-find_package(OpenCV REQUIRED COMPONENTS
-  ${OPENCV_MODULES}
-)
+find_package(OpenCV REQUIRED COMPONENTS core bgsegm imgproc)
 find_package(OpenSSL CONFIG REQUIRED)
 find_package(OpenH264 REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-
-
-add_library(Detector SHARED
-  src/Detector/Detector.cxx
-  src/Detector/MotionDetector.cxx
-  include/Detector/Detector.h
-  include/Detector/MotionDetector.h
-)
-add_library(HomeAssistant SHARED
-  src/HomeAssistant/HassHandler.cxx
-  include/HomeAssistant/HassHandler.h
-)
-add_library(Util SHARED
-  src/Util/CurlWrapper.cxx
-  src/Util/BufferOperations.cxx
-  src/Util/ProgramOptions.cxx
-  include/Util/CurlWrapper.h
-  include/Util/EventHandler.h
-  include/Util/BufferOperations.h
-  include/Util/ProgramOptions.h
-)
-add_library(VideoSource SHARED
-  src/VideoSource/Http.cxx
-  src/VideoSource/Live555.cxx
-  src/VideoSource/VideoSource.cxx
-  include/VideoSource/Http.h
-  include/VideoSource/Live555.h
-  include/VideoSource/VideoSource.h
-)
-
-if (USE_GRAPHICAL_USER_INTERFACE)
-  add_library(Gui SHARED
-    src/Gui/GuiHandler.cxx
-    include/Gui/GuiHandler.h
-  )
-  target_link_libraries(Gui PUBLIC
-    opencv_highgui
-  )
-else()
-  add_library(Gui SHARED
-    src/Gui/WebHandler.cxx
-    include/Gui/WebHandler.h
-    "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
-  )
-
-  option(HOT_RELOAD_WEB_UI "Enable hot-reload of the Web UI" OFF)
-  if (HOT_RELOAD_WEB_UI)
-    target_compile_definitions(Gui PRIVATE SERVE_UNPACKED)
-  endif()
-
-  file(GLOB_RECURSE GUI_PUBLIC_FILES RELATIVE "${CMAKE_SOURCE_DIR}/src/Gui/" "src/Gui/public/*" )
-  file(GLOB_RECURSE GUI_PUBLIC_FILES_ABS "${CMAKE_SOURCE_DIR}/src/Gui/public/*" )
-  add_custom_command(OUTPUT packed_fs.c
-    COMMAND unofficial::mongoose::pack ${GUI_PUBLIC_FILES} > "${CMAKE_CURRENT_BINARY_DIR}/packed_fs.c"
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/Gui"
-    DEPENDS ${GUI_PUBLIC_FILES_ABS}
-  )
-
-  find_package(unofficial-mongoose REQUIRED)
-  target_link_libraries(Gui PUBLIC
-    Detector
-    unofficial::mongoose::mongoose
-    VideoSource
-  )
-endif()
 
 add_executable(MotionDetection
     include/Logger.h
@@ -135,51 +57,21 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/.env)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${CMAKE_SOURCE_DIR}/.env
     $<TARGET_FILE_DIR:MotionDetection>/.env
-)
+ )
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-target_link_libraries(Detector PUBLIC
-  opencv_core
-  opencv_imgproc
-  opencv_bgsegm
-  spdlog::spdlog
-)
-target_link_libraries(HomeAssistant PUBLIC
-  Boost::url
-  Detector
-  nlohmann_json::nlohmann_json
-  spdlog::spdlog
-  Util
-)
-target_link_libraries(Util PUBLIC
-  CURL::libcurl
-  Boost::program_options
-  Boost::url
-  OpenSSL::SSL
-  OpenSSL::Crypto
-  spdlog::spdlog
-)
-target_link_libraries(VideoSource PUBLIC
-  Util
-  Boost::url
-  Live555::groupsock
-  Live555::liveMedia
-  Live555::UsageEnvironment
-  Live555::BasicUsageEnvironment
-  ${OPENH264_LIBRARIES}
-  opencv_core
-  opencv_imgproc
-  opencv_imgcodecs
-  spdlog::spdlog
-)
+add_subdirectory(src/Detector)
+add_subdirectory(src/Gui)
+add_subdirectory(src/HomeAssistant)
+add_subdirectory(src/Util)
+add_subdirectory(src/VideoSource)
+
+set(PROJECT_SHARED_LIBS "Detector;Gui;HomeAssistant;Util;VideoSource")
+
 target_link_libraries(MotionDetection PRIVATE
-  Detector
-  Gui
-  HomeAssistant
-  Util
-  VideoSource
+  ${PROJECT_SHARED_LIBS}
   opencv_core
   opencv_imgproc
   spdlog::spdlog
@@ -199,7 +91,7 @@ install(TARGETS MotionDetection
   EXPORT ${PROJECT_NAME}
   DESTINATION bin
 )
-install(TARGETS Detector Gui HomeAssistant Util VideoSource
+install(TARGETS ${PROJECT_SHARED_LIBS}
   EXPORT ${PROJECT_NAME}
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib

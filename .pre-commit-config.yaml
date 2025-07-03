@@ -27,5 +27,13 @@ repos:
   rev: v1.7.7
   hooks:
     - id: actionlint
+- repo: local
+  hooks:
+    - id: sync-version
+      name: sync-version
+      language: python
+      additional_dependencies: [ "ruamel.yaml" ]
+      entry: python hooks/sync_version.py
+      files: motion_detection_addon/config.yaml|VERSION
 
 ci: {}
