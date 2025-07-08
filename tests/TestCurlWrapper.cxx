@@ -3,16 +3,28 @@
 #include <gtest/gtest.h>
 
 #include "Util/BufferOperations.h"
+#include "Util/CurlMultiWrapper.h"
 #include "Util/CurlWrapper.h"
 
 #include "SimServer.h"
 
 TEST(CurlWrapperTests, Smoke) {
   util::CurlWrapper wCurl;
+
+  curl_off_t uploadData{0};
+  wCurl(curl_easy_getinfo, CURLINFO_CONTENT_LENGTH_UPLOAD_T, &uploadData);
+  EXPECT_EQ(uploadData, -1);
   EXPECT_NO_THROW(curl_easy_reset(&wCurl));
 }
 
-TEST(CurlWrapperTests, CanMakeGetRquest) {
+TEST(CurlMultiWrapperTests, Smoke) {
+  util::CurlMultiWrapper wCurl;
+  CURL **handles = curl_multi_get_handles(wCurl.pCurl_);
+  EXPECT_EQ(handles[0], nullptr);
+  curl_free(handles);
+}
+
+TEST(CurlWrapperTests, CanMakeGetRequest) {
 
   util::CurlWrapper wCurl;
 

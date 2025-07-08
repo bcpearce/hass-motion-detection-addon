@@ -7,7 +7,7 @@
 
 #include <thread>
 
-#include <BasicUsageEnvironment.hh>
+#include <UsageEnvironment.hh>
 #include <boost/url.hpp>
 
 namespace video_source {
@@ -29,6 +29,8 @@ public:
   void InitStream() override;
   void StopStream() override;
   [[nodiscard]] bool IsActive() override { return eventLoopWatchVar_ == 0; }
+
+  TaskScheduler *GetTaskSchedulerPtr() { return pScheduler_; }
 
   const boost::url &GetUrl() const { return url_; };
 

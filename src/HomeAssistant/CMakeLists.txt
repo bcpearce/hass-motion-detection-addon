@@ -1,5 +1,6 @@
 add_library(HomeAssistant SHARED
   AsyncHassHandler.cxx
+  BaseHassHandler.cxx
   ThreadedHassHandler.cxx
 )
 
@@ -8,6 +9,7 @@ target_link_libraries(HomeAssistant PUBLIC
   Detector
   nlohmann_json::nlohmann_json
   spdlog::spdlog
+  Live555::UsageEnvironment
   Util
 )
 

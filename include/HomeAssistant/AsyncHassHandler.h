@@ -1,27 +1,32 @@
-#ifndef INCLUDE_HOME_ASSISTANT_ASYNC_REST_HANDLER_H
-#define INCLUDE_HOME_ASSISTANT_ASYNC_REST_HANDLER_H
+#ifndef INCLUDE_HOME_ASSISTANT_ASYNC_HASS_HANDLER_H
+#define INCLUDE_HOME_ASSISTANT_ASYNC_HASS_HANDLER_H
 
 #include "Detector/Detector.h"
 
+#include "HomeAssistant/BaseHassHandler.h"
+
 #include <memory>
 #include <string_view>
+#include <unordered_map>
 
+#include <UsageEnvironment.hh>
 #include <boost/url.hpp>
 
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
+#include "Util/CurlMultiWrapper.h"
+#include "Util/CurlWrapper.h"
+
 namespace home_assistant {
 
 using json = nlohmann::json;
 
-class AsyncHassHandler {
+class AsyncHassHandler : public BaseHassHandler {
 
 public:
-  [[nodiscard]] static std::unique_ptr<AsyncHassHandler>
-  Create(boost::url url, std::string token, std::string entityId);
-
-  AsyncHassHandler(boost::url url, std::string token, std::string entityId);
+  AsyncHassHandler(const boost::url &url, const std::string &token,
+                   const std::string &entityId);
   AsyncHassHandler(const AsyncHassHandler &) = delete;
   AsyncHassHandler(AsyncHassHandler &&) = delete;
   AsyncHassHandler &operator=(const AsyncHassHandler &) = delete;
@@ -29,38 +34,45 @@ public:
 
   virtual ~AsyncHassHandler() noexcept = default;
 
-  virtual void
-  operator()(std::optional<detector::RegionsOfInterest> rois = {}) = 0;
-
-  std::chrono::duration<double> debounceTime{30.0};
-  std::string friendlyName;
-  std::string entityId;
+  void Register(TaskScheduler *pSched);
 
 protected:
-  void UpdateState(std::string_view state, const json &attributes = {});
+  void UpdateState(std::string_view state, const json &attributes) override;
 
 private:
-  boost::url url_;
-  std::string token_;
+  struct CurlMultiContext {
+    TaskScheduler *pSched_{nullptr};
+    AsyncHassHandler *pHandler{nullptr};
+    util::CurlMultiWrapper wCurlMulti_;
+    TaskToken token_{};
+  };
+  CurlMultiContext curlMultiCtx_;
 
-  std::vector<char> buf_;
+  struct CurlEasyContext {
+    TaskScheduler *pSched{nullptr};
+    util::CurlWrapper wCurl;
+    std::vector<char> buf;
+  };
+
+  struct CurlSocketContext {
+    curl_socket_t sockfd{};
+    CurlMultiContext *pMultiContext{nullptr};
+  };
+  std::unordered_map<size_t, std::shared_ptr<CurlEasyContext>> ctxs_;
 
   json currentState_;
   json nextState_;
-};
+  bool allowUpdate_{true};
 
-class AsyncBinarySensorHandler : public AsyncHassHandler {
-public:
-  using AsyncHassHandler::AsyncHassHandler;
-  void
-  operator()(std::optional<detector::RegionsOfInterest> rois = {}) override;
-};
+  static int SocketCallback(CURL *easy, curl_socket_t s, int action,
+                            CurlMultiContext *mc, void *socketp);
+  static int TimeoutCallback(CURLM *multi, int timeoutMs, CurlMultiContext *mc);
 
-class AsyncSensorHandler : public AsyncHassHandler {
-public:
-  using AsyncHassHandler::AsyncHassHandler;
-  void
-  operator()(std::optional<detector::RegionsOfInterest> rois = {}) override;
+  static void CheckMultiInfo(CurlSocketContext &ctx);
+
+  static void BackgroundHandlerProc(void *clientData, int mask);
+  static void TimeoutHandlerProc(void *clientData);
+  static void DebounceUpdateProc(void *clientData);
 };
 
 } // namespace home_assistant

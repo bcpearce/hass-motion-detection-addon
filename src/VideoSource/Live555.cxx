@@ -1,6 +1,8 @@
 #include "Logger.h"
 #include "WindowsWrapper.h"
 
+#include <BasicUsageEnvironment.hh>
+
 #include "VideoSource/Live555.h"
 
 #include <format>
@@ -301,11 +303,16 @@ Live555VideoSource::Live555VideoSource(const boost::url &url,
     url_.set_user(username);
     url_.set_password(password);
   }
+  pScheduler_ = BasicTaskScheduler::createNew();
 }
 
 Live555VideoSource::~Live555VideoSource() {
   eventLoopWatchVar_.store(1);
   shutdownStream(pRtspClient_.release());
+  pEnv_->reclaim();
+  if (pScheduler_) {
+    delete pScheduler_;
+  }
 }
 
 void Live555VideoSource::InitStream() {
@@ -313,7 +320,6 @@ void Live555VideoSource::InitStream() {
     throw std::runtime_error("No URL specified");
   }
 
-  pScheduler_ = BasicTaskScheduler::createNew();
   pEnv_ = BasicUsageEnvironment::createNew(*pScheduler_);
 
 // Open URL and establish connection

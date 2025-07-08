@@ -12,7 +12,8 @@ add_executable(MotionDetectionTests
   TestProgramOptions.cxx
   TestMotionDetector.cxx
   TestVideoSource.cxx
-  TestWebHandler.cxx)
+  TestWebHandler.cxx
+)
 
 target_link_libraries(
   MotionDetectionTests PRIVATE

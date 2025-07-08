@@ -19,6 +19,7 @@
 
 #include "Detector/MotionDetector.h"
 #include "Gui/WebHandler.h"
+#include "HomeAssistant/AsyncHassHandler.h"
 #include "HomeAssistant/ThreadedHassHandler.h"
 #include "Util/ProgramOptions.h"
 #include "VideoSource/Http.h"
@@ -72,12 +73,30 @@ void App(const util::ProgramOptions &opts) {
 
   pSource->Subscribe(onFrameCallback);
 
-  std::shared_ptr<home_assistant::HassHandler> pHassHandler;
+  std::shared_ptr<home_assistant::BaseHassHandler> pHassHandler;
   if (opts.CanSetupHass()) {
     LOGGER->info("Setting up Home Assistant status update for {} hosted at {}",
                  opts.hassEntityId, opts.hassUrl);
-    pHassHandler = home_assistant::HassHandler::Create(
-        opts.hassUrl, opts.hassToken, opts.hassEntityId);
+    if (std::dynamic_pointer_cast<video_source::HttpVideoSource>(pSource)) {
+      // Require Threaded
+      LOGGER->info("Running Home Assistant callbacks in separate thread");
+      auto pThreadedHassHandler =
+          std::make_shared<home_assistant::ThreadedHassHandler>(
+              opts.hassUrl, opts.hassToken, opts.hassEntityId);
+
+      pThreadedHassHandler->Start();
+      pHassHandler = pThreadedHassHandler;
+    } else if (auto pLive555Source =
+                   std::dynamic_pointer_cast<video_source::Live555VideoSource>(
+                       pSource)) {
+      // Optimize with Async
+      LOGGER->info("Running Home Assistant callbacks in main event loop");
+      auto pAsyncHassHandler =
+          std::make_shared<home_assistant::AsyncHassHandler>(
+              opts.hassUrl, opts.hassToken, opts.hassEntityId);
+      pAsyncHassHandler->Register(pLive555Source->GetTaskSchedulerPtr());
+      pHassHandler = pAsyncHassHandler;
+    }
 
     pHassHandler->friendlyName = opts.hassFriendlyName;
     pHassHandler->debounceTime = opts.detectionDebounce;
@@ -87,7 +106,6 @@ void App(const util::ProgramOptions &opts) {
           pHassHandler->operator()(data.rois);
         };
     pDetector->Subscribe(onMotionDetectionCallbackHass);
-    pHassHandler->Start();
   }
 
   gui::WebHandler gh(opts.webUiPort, opts.webUiHost);

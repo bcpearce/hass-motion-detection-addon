@@ -1,4 +1,5 @@
 add_library(Util SHARED
+  CurlMultiWrapper.cxx
   CurlWrapper.cxx
   BufferOperations.cxx
   ProgramOptions.cxx

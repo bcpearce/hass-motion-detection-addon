@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string_view>
 
+#include "HomeAssistant/Json.h"
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
 
@@ -16,39 +17,18 @@ using namespace std::string_view_literals;
 
 namespace home_assistant {
 
-[[nodiscard]] std::unique_ptr<HassHandler>
-home_assistant::HassHandler::Create(const boost::url &url,
-                                    const std::string &token,
-                                    std::string_view entityId) {
-  if (entityId.starts_with("binary_sensor."sv)) {
-    return std::make_unique<BinarySensorHandler>(url, token, entityId);
-  } else if (entityId.starts_with("sensor."sv)) {
-    return std::make_unique<SensorHandler>(url, token, entityId);
-  }
-  throw std::runtime_error(std::format(
-      "Unsupported entity type for Home Assistant Handler: {}", entityId));
-}
+ThreadedHassHandler::ThreadedHassHandler(const boost::url &url,
+                                         const std::string &token,
+                                         const std::string &entityId)
+    : BaseHassHandler(url, token, entityId) {}
 
-HassHandler::HassHandler(const boost::url &url, const std::string &token,
-                         std::string_view entityId)
-    : url_{url}, token_{token}, entityId{entityId} {}
-
-void HassHandler::Start() {
-
-  if (std::string_view(url_.host().c_str()) == "supervisor"sv) {
-    url_.set_path(std::format("/core/api/states/{}", entityId));
-    LOGGER->info("Supervisor detected, setting URL to {}", url_);
-  } else {
-    url_.set_path(std::format("/api/states/{}", entityId));
-    LOGGER->info("Setting URL to {}", url_);
-  }
-
+void ThreadedHassHandler::Start() {
   util::CurlWrapper wCurl;
-  wCurl(curl_easy_setopt, CURLOPT_URL, url_.c_str());
+  wCurl(curl_easy_setopt, CURLOPT_URL, GetUrl().c_str());
   wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
   wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf_);
   wCurl(curl_easy_setopt, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
-  wCurl(curl_easy_setopt, CURLOPT_XOAUTH2_BEARER, token_.c_str());
+  wCurl(curl_easy_setopt, CURLOPT_XOAUTH2_BEARER, GetToken().c_str());
   wCurl(curl_easy_setopt, CURLOPT_HTTPGET, 1L);
   if (const auto res = wCurl(curl_easy_perform); res == CURLE_OK) {
     int code{0};
@@ -85,7 +65,7 @@ void HassHandler::Start() {
       }
       throw std::runtime_error(std::format(
           "Failed get base status of entity {} at {} with code {}: {}",
-          url_.c_str(), entityId, code, contentTypeDesc));
+          GetUrl().c_str(), entityId, code, contentTypeDesc));
     }
     }
   }
@@ -158,9 +138,11 @@ void HassHandler::Start() {
     } while (!stopToken.stop_requested());
   });
 }
-void HassHandler::Stop() { updaterThread_ = {}; }
 
-void HassHandler::UpdateState(std::string_view state, const json &attributes) {
+void ThreadedHassHandler::Stop() { updaterThread_ = {}; }
+
+void ThreadedHassHandler::UpdateState(std::string_view state,
+                                      const json &attributes) {
   std::unique_lock lk(mtx_);
   nextState_["state"] = state;
   nextState_["attributes"] = attributes;
@@ -168,54 +150,6 @@ void HassHandler::UpdateState(std::string_view state, const json &attributes) {
     nextState_["attributes"]["friendly_name"] = friendlyName;
   }
   cv_.notify_all();
-}
-
-void to_json(json &j, const cv::Rect &rect) {
-  j = json{{"x", rect.x},
-           {"y", rect.y},
-           {"width", rect.width},
-           {"height", rect.height}};
-}
-
-void from_json(const json &j, cv::Rect &rect) {
-  rect.x = j.at("x").get<int>();
-  rect.y = j.at("y").get<int>();
-  rect.width = j.at("width").get<int>();
-  rect.height = j.at("height").get<int>();
-}
-
-void BinarySensorHandler::operator()(
-    std::optional<detector::RegionsOfInterest> rois) {
-  const std::string_view nextState = rois.and_then([](auto r) {
-                                           return r.size() > 0
-                                                      ? std::optional{"on"sv}
-                                                      : std::optional{"off"sv};
-                                         })
-                                         .value_or("unknown"sv);
-  json attributes;
-  attributes["device_class"] = "motion";
-  for (const auto &roi : rois.value_or(detector::RegionsOfInterest{})) {
-    json roiJson;
-    to_json(roiJson, roi);
-    attributes["rois"].push_back(roiJson);
-  }
-  HassHandler::UpdateState(nextState, attributes);
-}
-
-void SensorHandler::operator()(
-    std::optional<detector::RegionsOfInterest> rois) {
-  const std::string nextState =
-      rois.and_then([](auto r) {
-            return std::make_optional(std::to_string(r.size()));
-          })
-          .value_or("unknown"s);
-  json attributes;
-  for (const auto &roi : detector::RegionsOfInterest{}) {
-    json roiJson;
-    to_json(roiJson, roi);
-    attributes["rois"].push_back(roiJson);
-  }
-  HassHandler::UpdateState(nextState, attributes);
 }
 
 } // namespace home_assistant
