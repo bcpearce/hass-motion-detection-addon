@@ -15,8 +15,27 @@
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-namespace home_assistant {
+namespace {
+static size_t contextId{1};
 
+[[nodiscard]] bool NoCaseCmp(const char *s1, const char *s2) {
+  if (s1 && s2) {
+    auto sv1 = std::string_view(s1);
+    auto sv2 = std::string_view(s2);
+    return sv1.size() == sv2.size() &&
+           std::ranges::all_of(std::views::zip_transform(
+                                   [](auto c1, auto c2) -> bool {
+                                     return std::tolower(c1) ==
+                                            std::tolower(c2);
+                                   },
+                                   sv1, sv2),
+                               [](auto b) { return b; });
+  }
+}
+
+} // namespace
+
+namespace home_assistant {
 int AsyncHassHandler::SocketCallback(CURL *easy, curl_socket_t s, int action,
                                      CurlMultiContext *mc, void *socketp) {
   switch (action) {
@@ -45,7 +64,7 @@ int AsyncHassHandler::SocketCallback(CURL *easy, curl_socket_t s, int action,
       mc->pSched_->disableBackgroundHandling(s);
       CurlSocketContext *pCtx = static_cast<CurlSocketContext *>(socketp);
       auto upCtx = std::unique_ptr<CurlSocketContext>(
-          pCtx); // take ownership to destroy on scop exit
+          pCtx); // take ownership to destroy on scope exit
       upCtx->pMultiContext->wCurlMulti_(curl_multi_assign, s, nullptr);
     }
     break;
@@ -67,25 +86,40 @@ int AsyncHassHandler::TimeoutCallback(CURLM *multi, int timeoutMs,
   return 0;
 }
 
-void AsyncHassHandler::CheckMultiInfo(CurlSocketContext &csc) {
+void AsyncHassHandler::CheckMultiInfo(CurlMultiContext &mc) {
   CURLMsg *message{nullptr};
-  auto *mc = csc.pMultiContext;
 
   int pending{0};
 
-  auto &wCurlMulti = mc->wCurlMulti_;
+  auto &wCurlMulti = mc.wCurlMulti_;
   while ((message = curl_multi_info_read(wCurlMulti.pCurl_, &pending))) {
     switch (message->msg) {
     case CURLMSG_DONE: {
+      size_t ctxId{0};
       CURL *easy = message->easy_handle;
-      int ctxId{-1};
-      curl_easy_getinfo(easy, CURLINFO_PRIVATE, &ctxId);
-      if (auto ec = mc->pHandler->ctxs_[ctxId]) {
-        std::cerr << std::string_view(ec->buf) << "\n";
 
-        // cleanup
-        wCurlMulti(curl_multi_remove_handle, ec->wCurl.pCurl_);
-        mc->pHandler->ctxs_.erase(ctxId);
+      curl_easy_getinfo(easy, CURLINFO_PRIVATE, &ctxId);
+      if (auto *pHandler = mc.pHandler) {
+        auto it = pHandler->ctxs_.find(ctxId);
+        if (it != pHandler->ctxs_.end()) {
+          auto &pCtx = it->second;
+          try {
+            char *effectiveMethod{nullptr};
+            curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_METHOD,
+                              &effectiveMethod);
+            if (NoCaseCmp(effectiveMethod, "GET")) {
+              pHandler->HandleGetResponse(pCtx->wCurl, pCtx->inBuf);
+            } else if (NoCaseCmp(effectiveMethod, "POST")) {
+              pHandler->HandlePostResponse(pCtx->wCurl, pCtx->inBuf);
+            }
+          } catch (const std::exception &e) {
+            LOGGER->error(e.what());
+          }
+
+          // cleanup
+          wCurlMulti(curl_multi_remove_handle, pCtx->wCurl.pCurl_);
+          pHandler->ctxs_.erase(it);
+        }
       }
       break;
     }
@@ -97,17 +131,21 @@ void AsyncHassHandler::CheckMultiInfo(CurlSocketContext &csc) {
 }
 
 void AsyncHassHandler::BackgroundHandlerProc(void *clientData, int mask) {
-  int flags{0};
-  if (mask & SOCKET_READABLE) {
-    flags |= CURL_CSELECT_IN;
+  if (clientData) {
+    int flags{0};
+    if (mask & SOCKET_READABLE) {
+      flags |= CURL_CSELECT_IN;
+    }
+    if (mask & SOCKET_WRITABLE) {
+      flags |= CURL_CSELECT_OUT;
+    }
+    CurlSocketContext *csc = static_cast<CurlSocketContext *>(clientData);
+    CurlMultiContext *mc = csc->pMultiContext;
+    int runningHandles{0};
+    csc->pMultiContext->wCurlMulti_(curl_multi_socket_action, csc->sockfd,
+                                    flags, &runningHandles);
+    CheckMultiInfo(*mc);
   }
-  if (mask & SOCKET_WRITABLE) {
-    flags |= CURL_CSELECT_OUT;
-  }
-  CurlSocketContext *csc = static_cast<CurlSocketContext *>(clientData);
-  int runningHandles{0};
-  csc->pMultiContext->wCurlMulti_(curl_multi_socket_action, csc->sockfd, flags,
-                                  &runningHandles);
 }
 
 void AsyncHassHandler::TimeoutHandlerProc(void *curlMultiContext_clientData) {
@@ -117,6 +155,7 @@ void AsyncHassHandler::TimeoutHandlerProc(void *curlMultiContext_clientData) {
     int runningHandles{-1};
     mc->wCurlMulti_(curl_multi_socket_action, CURL_SOCKET_TIMEOUT, 0,
                     &runningHandles);
+    CheckMultiInfo(*mc);
   }
 }
 
@@ -155,32 +194,43 @@ void AsyncHassHandler::Register(TaskScheduler *pSched) {
   int runningHandles{0};
   curlMultiCtx_.wCurlMulti_(curl_multi_socket_action, CURL_SOCKET_TIMEOUT, 0,
                             &runningHandles);
+
+  GetInitialState();
 }
 
-void AsyncHassHandler::UpdateState(std::string_view state,
-                                   const json &attributes) {
-  static size_t id{0};
+void AsyncHassHandler::UpdateState_Impl(std::string_view state,
+                                        const json &attributes) {
+  UpdateStateInternal(state, attributes);
 
-  const bool stateChanging = nextState_ != currentState_;
+  const bool stateChanging = IsStateChanging();
   if (allowUpdate_ && stateChanging) {
     // insert and  get a reference to this
     // not thread safe
     auto pCtx = std::make_shared<CurlEasyContext>(curlMultiCtx_.pSched_);
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &pCtx->buf);
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION,
-                util::FillBufferCallback);
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, id);
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_URL, GetUrl().c_str());
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_XOAUTH2_BEARER, GetToken().c_str());
+
+    pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
+    PreparePostRequest(pCtx->wCurl, pCtx->inBuf, pCtx->outBuf);
+
     curlMultiCtx_.wCurlMulti_(curl_multi_add_handle, pCtx->wCurl.pCurl_);
-    ctxs_[id++] = pCtx;
+    ctxs_[contextId++] = pCtx;
+
+    // debounce
     allowUpdate_ = false;
     curlMultiCtx_.pSched_->scheduleDelayedTask(
         std::chrono::duration_cast<std::chrono::microseconds>(debounceTime)
             .count(),
         DebounceUpdateProc, this);
   }
+}
+
+void AsyncHassHandler::GetInitialState() {
+  auto pCtx = std::make_shared<CurlEasyContext>(curlMultiCtx_.pSched_);
+
+  pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
+  PrepareGetRequest(pCtx->wCurl, pCtx->inBuf);
+
+  curlMultiCtx_.wCurlMulti_(curl_multi_add_handle, pCtx->wCurl.pCurl_);
+  ctxs_[contextId++] = pCtx;
 }
 
 } // namespace home_assistant

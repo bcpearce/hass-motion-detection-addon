@@ -37,7 +37,8 @@ public:
   void Register(TaskScheduler *pSched);
 
 protected:
-  void UpdateState(std::string_view state, const json &attributes) override;
+  void UpdateState_Impl(std::string_view state,
+                        const json &attributes) override;
 
 private:
   struct CurlMultiContext {
@@ -51,7 +52,9 @@ private:
   struct CurlEasyContext {
     TaskScheduler *pSched{nullptr};
     util::CurlWrapper wCurl;
-    std::vector<char> buf;
+    std::vector<char> inBuf;
+    std::string outBuf;
+    std::string_view outBufVw;
   };
 
   struct CurlSocketContext {
@@ -60,15 +63,15 @@ private:
   };
   std::unordered_map<size_t, std::shared_ptr<CurlEasyContext>> ctxs_;
 
-  json currentState_;
-  json nextState_;
   bool allowUpdate_{true};
+
+  void GetInitialState();
 
   static int SocketCallback(CURL *easy, curl_socket_t s, int action,
                             CurlMultiContext *mc, void *socketp);
   static int TimeoutCallback(CURLM *multi, int timeoutMs, CurlMultiContext *mc);
 
-  static void CheckMultiInfo(CurlSocketContext &ctx);
+  static void CheckMultiInfo(CurlMultiContext &mc);
 
   static void BackgroundHandlerProc(void *clientData, int mask);
   static void TimeoutHandlerProc(void *clientData);

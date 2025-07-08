@@ -36,12 +36,10 @@ public:
   virtual ~ThreadedHassHandler() noexcept = default;
 
 protected:
-  void UpdateState(std::string_view state, const json &attributes) override;
+  void UpdateState_Impl(std::string_view state,
+                        const json &attributes) override;
 
 private:
-  json currentState_;
-  json nextState_;
-
   std::vector<char> buf_; // for CURL responses
   std::condition_variable_any cv_;
   std::shared_mutex mtx_;

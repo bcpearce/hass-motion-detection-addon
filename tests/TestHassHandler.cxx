@@ -84,10 +84,14 @@ TEST_F(AsyncHassHandlerTests, CanPostBinarySensor) {
 
     EventLoopWatchVariable wv{0};
 
-    constexpr std::chrono::milliseconds duration{1'000'000};
-    pSched_->scheduleDelayedTask(duration.count(), EndLoop, &wv);
+    const auto trigger = pSched_->createEventTrigger(EndLoop);
+
+    std::jthread watcher([&] {
+      EXPECT_EQ(std::future_status::ready,
+                SimServer::WaitForHassApiCount(startApiCalls + 2, 10s));
+      pSched_->triggerEvent(trigger, &wv);
+    });
 
     pSched_->doEventLoop(&wv);
   }
-  EXPECT_EQ(SimServer::GetHassApiCount(), startApiCalls + 2);
 }

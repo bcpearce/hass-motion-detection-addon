@@ -3,6 +3,7 @@
 
 #include <mongoose.h>
 
+#include <future>
 #include <thread>
 
 #include <boost/url.hpp>
@@ -26,6 +27,8 @@ public:
   ~SimServer() noexcept = default;
 
   static int GetHassApiCount();
+  static std::future_status WaitForHassApiCount(int target,
+                                                std::chrono::seconds timeout);
   static void ev_handler(struct mg_connection *c, int ev, void *ev_data);
 
 protected:

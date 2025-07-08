@@ -122,3 +122,9 @@ void SimServer::Stop() { listenerThread = {}; }
 const boost::url &SimServer::GetBaseUrl() { return url; }
 
 int SimServer::GetHassApiCount() { return hassApiCalls_.load(); }
+
+std::future_status
+SimServer::WaitForHassApiCount(int target, std::chrono::seconds timeout) {
+  auto fut = std::async([target] { hassApiCalls_.wait(target); });
+  return fut.wait_for(timeout);
+}

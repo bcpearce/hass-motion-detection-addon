@@ -110,7 +110,7 @@ struct StreamClientState {
   MediaSession *session{nullptr};
   MediaSubsession *subsession{nullptr};
   VideoSource *pVideoSource{nullptr};
-  TaskToken streamTimerTask;
+  TaskToken streamTimerTask{nullptr};
   double duration{0.0};
 
   ~StreamClientState() {
@@ -309,7 +309,9 @@ Live555VideoSource::Live555VideoSource(const boost::url &url,
 Live555VideoSource::~Live555VideoSource() {
   eventLoopWatchVar_.store(1);
   shutdownStream(pRtspClient_.release());
-  pEnv_->reclaim();
+  if (pEnv_) {
+    pEnv_->reclaim();
+  }
   if (pScheduler_) {
     delete pScheduler_;
   }
