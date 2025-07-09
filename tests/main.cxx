@@ -9,14 +9,16 @@ namespace {
 class ServerEnvironment : public ::testing::Environment {
 public:
   void SetUp() override { SimServer::Start(SIM_SERVER_PORT); }
+  void TearDown() override { SimServer::Stop(); }
 };
 
 class LoggerEnvironment : public ::testing::Environment {
 public:
   void SetUp() override {
-    auto stdoutLogger = logger::InitStderrLogger();
-    auto stderrLogger = logger::InitStdoutLogger();
+    auto stdoutLogger = logger::InitStdoutLogger();
+    auto stderrLogger = logger::InitStderrLogger();
   }
+  void TearDown() override {}
 };
 
 } // namespace

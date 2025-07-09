@@ -49,18 +49,17 @@ void BaseHassHandler::UpdateStateInternal(std::string_view state,
 
 void BaseHassHandler::UpdateBinarySensor(
     std::optional<detector::RegionsOfInterest> rois) {
-  const std::string_view nextState = rois.and_then([](auto r) {
-                                           return r.size() > 0
-                                                      ? std::optional{"on"sv}
-                                                      : std::optional{"off"sv};
-                                         })
-                                         .value_or("unknown"sv);
+  const std::string nextState =
+      rois.and_then([](auto r) {
+            return r.size() > 0 ? std::optional{"on"s} : std::optional{"off"s};
+          })
+          .value_or("unknown"s);
   json attributes;
   attributes["device_class"] = "motion";
   for (const auto &roi : rois.value_or(detector::RegionsOfInterest{})) {
     json roiJson;
     to_json(roiJson, roi);
-    attributes["rois"].push_back(roiJson);
+    attributes["rois"].push_back(std::move(roiJson));
   }
   UpdateState_Impl(nextState, attributes);
 }
@@ -76,7 +75,7 @@ void BaseHassHandler::UpdateSensor(
   for (const auto &roi : detector::RegionsOfInterest{}) {
     json roiJson;
     to_json(roiJson, roi);
-    attributes["rois"].push_back(roiJson);
+    attributes["rois"].push_back(std::move(roiJson));
   }
   UpdateState_Impl(nextState, attributes);
 }

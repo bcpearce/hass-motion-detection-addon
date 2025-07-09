@@ -82,6 +82,15 @@ if (WIN32)
   target_link_libraries(VideoSource PUBLIC ws2_32 mswsock)
 endif()
 
+if (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(STATUS "Enabling AddressSanitizer for GCC")
+        add_compile_options(-fsanitize=address)
+        add_link_options(-fsanitize=address)
+    endif()
+endif()
+
+
 if(BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)

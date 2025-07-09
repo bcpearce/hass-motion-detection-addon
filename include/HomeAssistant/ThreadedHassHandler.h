@@ -42,7 +42,7 @@ protected:
 private:
   std::vector<char> buf_; // for CURL responses
   std::condition_variable_any cv_;
-  std::shared_mutex mtx_;
+  std::mutex mtx_;
   std::jthread updaterThread_;
 };
 
