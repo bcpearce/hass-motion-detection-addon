@@ -27,8 +27,13 @@ TEST_P(TestHassHandler, CanPostBinarySensorUpdate) {
     std::vector rois = {cv::Rect(50, 50, 50, 50)};
 
     (*binarySensor)(rois);
+
+    std::jthread watcher([&] {
+      EXPECT_EQ(std::future_status::ready,
+                SimServer::WaitForHassApiCount(startApiCalls + 2, 10s));
+    });
+    watcher.join();
   }
-  EXPECT_GT(SimServer::GetHassApiCount(), startApiCalls);
 }
 
 TEST_P(TestHassHandler, FailsWithoutBearerToken) {
