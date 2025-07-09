@@ -2,15 +2,16 @@
 #include "WindowsWrapper.h"
 
 #include "HomeAssistant/AsyncHassHandler.h"
+
+#include <iostream>
+#include <ranges>
+#include <string_view>
+
 #include <UsageEnvironment.hh>
 
 #include "HomeAssistant/Json.h"
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
-
-#include <iostream>
-
-#include <string_view>
 
 using namespace std::string_literals;
 using namespace std::string_view_literals;
@@ -31,6 +32,7 @@ static size_t contextId{1};
                                    sv1, sv2),
                                [](auto b) { return b; });
   }
+  return false;
 }
 
 } // namespace
