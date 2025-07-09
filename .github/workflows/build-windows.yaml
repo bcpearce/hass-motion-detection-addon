@@ -58,7 +58,7 @@ jobs:
         run: cmake --build build/Debug
 
       - name: Test Debug
-        run: ctest --output-junit test_detail_debug.xml
+        run: ctest --output-junit test_detail_debug.xml --output-on-failure
         working-directory: ./build/Debug
 
       - name: Generate and Configure Release
@@ -72,7 +72,7 @@ jobs:
         run: cmake --build build/Release
 
       - name: Test Release
-        run: ctest --output-junit test_detail_release.xml
+        run: ctest --output-junit test_detail_release.xml --output-on-failure
         working-directory: ./build/Release
 
       - name: Test Summary
