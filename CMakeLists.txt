@@ -49,7 +49,7 @@ add_executable(MotionDetection
   include/Logger.h
   include/WindowsWrapper.h
   src/main.cxx
-)
+ "include/HomeAssistant/SyncHassHandler.h")
 
 if (EXISTS ${CMAKE_SOURCE_DIR}/.env)
   add_custom_command(

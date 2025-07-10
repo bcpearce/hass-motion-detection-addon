@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "HomeAssistant/AsyncHassHandler.h"
+#include "HomeAssistant/SyncHassHandler.h"
 #include "HomeAssistant/ThreadedHassHandler.h"
 #include "SimServer.h"
 #include "Util/CurlWrapper.h"
@@ -12,9 +13,10 @@
 using namespace std::chrono_literals;
 using namespace std::string_view_literals;
 
-class TestHassHandler : public testing::TestWithParam<std::string_view> {};
+class TestThreadedHassHandler
+    : public testing::TestWithParam<std::string_view> {};
 
-TEST_P(TestHassHandler, CanPostBinarySensorUpdate) {
+TEST_P(TestThreadedHassHandler, CanPostEntityUpdate) {
   const int startApiCalls = SimServer::GetHassApiCount();
   const std::string entityId{GetParam()};
   {
@@ -35,7 +37,7 @@ TEST_P(TestHassHandler, CanPostBinarySensorUpdate) {
   }
 }
 
-TEST_P(TestHassHandler, FailsWithoutBearerToken) {
+TEST_P(TestThreadedHassHandler, FailsWithoutBearerToken) {
   const int startApiCalls = SimServer::GetHassApiCount();
   EXPECT_THROW(std::invoke([entityId = std::string(GetParam())] {
                  auto binarySensor =
@@ -46,22 +48,12 @@ TEST_P(TestHassHandler, FailsWithoutBearerToken) {
                std::runtime_error);
 }
 
-static constexpr auto binary_sensor__missing{"binary_sensor.missing"sv};
-static constexpr auto binary_sensor__motion_detector{
-    "binary_sensor.motion_detector"sv};
-static constexpr auto sensor__motion_objects{"sensor.motion_objects"sv};
-
-INSTANTIATE_TEST_SUITE_P(EntityIds, TestHassHandler,
-                         testing::Values(binary_sensor__missing,
-                                         binary_sensor__motion_detector,
-                                         sensor__motion_objects));
-
 void EndLoop(void *clientData) {
   auto *wv = std::bit_cast<EventLoopWatchVariable *>(clientData);
   wv->store(1);
 }
 
-class AsyncTestHassHandler : public testing::TestWithParam<std::string_view> {
+class TestAsyncHassHandler : public testing::TestWithParam<std::string_view> {
 protected:
   void SetUp() override { pSched_ = BasicTaskScheduler::createNew(); }
   void TearDown() override { delete pSched_; }
@@ -69,7 +61,7 @@ protected:
   TaskScheduler *pSched_{nullptr};
 };
 
-TEST_P(AsyncTestHassHandler, CanPostBinarySensorUpdate) {
+TEST_P(TestAsyncHassHandler, CanPostEntityUpdate) {
   const int startApiCalls = SimServer::GetHassApiCount();
   const std::string entityId{GetParam()};
   {
@@ -100,7 +92,33 @@ TEST_P(AsyncTestHassHandler, CanPostBinarySensorUpdate) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(EntityIds, AsyncTestHassHandler,
-                         testing::Values(binary_sensor__missing,
-                                         binary_sensor__motion_detector,
-                                         sensor__motion_objects));
+class TestSyncHassHandler : public testing::TestWithParam<std::string_view> {};
+
+TEST_P(TestSyncHassHandler, CanPostEntityUpdate) {
+  const int startApiCalls = SimServer::GetHassApiCount();
+  const std::string entityId{GetParam()};
+
+  home_assistant::SyncHassHandler syncHandler(SimServer::GetBaseUrl(),
+                                              sim_token::bearer, entityId);
+  syncHandler({});
+  // Expect 2 calls, one to get the initial data, then a second to update it
+  // with our changes
+  std::jthread watcher([&] {
+    EXPECT_EQ(std::future_status::ready,
+              SimServer::WaitForHassApiCount(startApiCalls + 2, 10s));
+  });
+}
+
+static constexpr auto binary_sensor__missing{"binary_sensor.missing"sv};
+static constexpr auto binary_sensor__motion_detector{
+    "binary_sensor.motion_detector"sv};
+static constexpr auto sensor__motion_objects{"sensor.motion_objects"sv};
+
+static const auto hassEntityIdValues =
+    testing::Values(binary_sensor__missing, binary_sensor__motion_detector,
+                    sensor__motion_objects);
+
+INSTANTIATE_TEST_SUITE_P(EntityIds, TestThreadedHassHandler,
+                         hassEntityIdValues);
+INSTANTIATE_TEST_SUITE_P(EntityIds, TestAsyncHassHandler, hassEntityIdValues);
+INSTANTIATE_TEST_SUITE_P(EntityIds, TestSyncHassHandler, hassEntityIdValues);

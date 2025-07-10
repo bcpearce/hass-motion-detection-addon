@@ -20,6 +20,7 @@
 #include "Detector/MotionDetector.h"
 #include "Gui/WebHandler.h"
 #include "HomeAssistant/AsyncHassHandler.h"
+#include "HomeAssistant/SyncHassHandler.h"
 #include "HomeAssistant/ThreadedHassHandler.h"
 #include "Util/ProgramOptions.h"
 #include "VideoSource/Http.h"
@@ -129,7 +130,13 @@ void App(const util::ProgramOptions &opts) {
     std::this_thread::sleep_for(500ms);
   }
 
-  (*pHassHandler)();
+  // At this point, performance is no longer critical as the feed is shut down,
+  // send the last message using a synchronous handler
+  if (opts.CanSetupHass()) {
+    home_assistant::SyncHassHandler syncHandler(opts.hassUrl, opts.hassToken,
+                                                opts.hassEntityId);
+    syncHandler({});
+  }
 }
 
 int main(int argc, const char **argv) {

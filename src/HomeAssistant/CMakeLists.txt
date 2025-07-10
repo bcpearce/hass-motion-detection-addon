@@ -1,6 +1,7 @@
 add_library(HomeAssistant SHARED
   AsyncHassHandler.cxx
   BaseHassHandler.cxx
+  SyncHassHandler.cxx
   ThreadedHassHandler.cxx
 )
 
