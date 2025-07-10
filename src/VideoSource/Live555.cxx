@@ -259,7 +259,11 @@ private:
                                 timeStamp);
     }
 
-    continuePlaying();
+    if (rVideoSource_.GetFrameCount() < rVideoSource_.maxFrames_) {
+      continuePlaying();
+    } else {
+      rVideoSource_.StopStream();
+    }
   }
 
   static void AfterGettingFrame(void *clientData, unsigned int frameSize,
@@ -317,7 +321,7 @@ Live555VideoSource::~Live555VideoSource() {
   }
 }
 
-void Live555VideoSource::InitStream() {
+void Live555VideoSource::StartStream(unsigned long long maxFrames) {
   if (url_.empty()) {
     throw std::runtime_error("No URL specified");
   }
@@ -340,19 +344,11 @@ void Live555VideoSource::InitStream() {
   }
   pRtspClient_->sendDescribeCommand(continueAfterDESCRIBE);
   eventLoopWatchVar_ = 0;
-
-  eventLoopThread_ = std::jthread([this] {
-#ifdef _WIN32
-    SetThreadDescription(GetCurrentThread(), L"Live555 Stream Thread");
-#endif
-    pEnv_->taskScheduler().doEventLoop(&eventLoopWatchVar_);
-  });
+  maxFrames_ = maxFrames;
+  pEnv_->taskScheduler().doEventLoop(&eventLoopWatchVar_);
 }
 
-void Live555VideoSource::StopStream() {
-  eventLoopWatchVar_.store(1);
-  eventLoopThread_ = {};
-}
+void Live555VideoSource::StopStream() { eventLoopWatchVar_.store(1); }
 
 void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
                                      int strideY, int strideUV, int timeStamp) {

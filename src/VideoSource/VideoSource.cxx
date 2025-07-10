@@ -18,6 +18,7 @@ void VideoSource::SetFrame(Frame frame) {
       frame.timeStamp - frame_.timeStamp);
   fps_ = 0.1 / delta.count() + fps_ * (1.0 - fpsAlpha);
   frame_ = frame;
+  ++frameCount_;
   OnEvent(frame_);
 }
 

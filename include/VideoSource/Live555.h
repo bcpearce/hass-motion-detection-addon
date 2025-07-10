@@ -26,7 +26,8 @@ public:
                      std::string_view password);
   ~Live555VideoSource() override;
 
-  void InitStream() override;
+  void StartStream(unsigned long long maxFrames =
+                       std::numeric_limits<unsigned long long>::max()) override;
   void StopStream() override;
   [[nodiscard]] bool IsActive() override { return eventLoopWatchVar_ == 0; }
 
@@ -38,13 +39,13 @@ private:
   void SetYUVFrame(uint8_t **pDataYUV, int width, int height, int strideY,
                    int strideUV, int timestamp);
 
+  unsigned long long maxFrames_{std::numeric_limits<unsigned long long>::max()};
+
   boost::url url_;
   std::unique_ptr<FrameRtspClient> pRtspClient_;
   TaskScheduler *pScheduler_{nullptr};
   UsageEnvironment *pEnv_{nullptr};
   EventLoopWatchVariable eventLoopWatchVar_{1};
-
-  std::jthread eventLoopThread_;
 };
 
 } // namespace video_source

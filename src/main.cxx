@@ -31,15 +31,25 @@ using namespace std::string_view_literals;
 using namespace std::chrono_literals;
 
 namespace {
-std::atomic_bool gExitFlag{false};
-} // namespace
-
-void ThreadedSignalHandler(int signal) {
-  if (signal == SIGINT || signal == SIGTERM) {
-    LOGGER->info("Received signal {} closing stream...", signal);
-    gExitFlag.store(true);
+struct ExitSignalHandler {
+  std::weak_ptr<video_source::VideoSource> wpSource;
+  void operator()(int signal) {
+    if (signal == SIGINT || signal == SIGTERM) {
+      LOGGER->info("Received signal {} closing stream...", signal);
+      if (auto spSource = wpSource.lock()) {
+        spSource->StopStream();
+      }
+    }
   }
+};
+
+static ExitSignalHandler exitSignalHandler;
+
+void SignalHandlerWrapper(int signal) {
+  exitSignalHandler(signal); // Call the functor's operator()
 }
+
+} // namespace
 
 void EventLoopSignalHandler(int signal) {}
 
@@ -111,24 +121,28 @@ void App(const util::ProgramOptions &opts) {
     pDetector->Subscribe(onMotionDetectionCallbackHass);
   }
 
-  gui::WebHandler gh(opts.webUiPort, opts.webUiHost);
-  LOGGER->info("Web interface started at {}", gh.GetUrl());
-  gh.Start();
-  auto onMotionDetectorCallbackGui = [&gh, pDetector,
-                                      pSource](detector::Payload data) {
-    gh({.rois = data.rois,
-        .frame = data.frame,
-        .detail = pDetector->GetModel(),
-        .fps = pSource->GetFramesPerSecond()});
-  };
-  pDetector->Subscribe(onMotionDetectorCallbackGui);
-
-  pSource->InitStream();
-  std::signal(SIGINT, ThreadedSignalHandler);
-  std::signal(SIGTERM, ThreadedSignalHandler);
-  while (!gExitFlag && pSource->IsActive()) {
-    std::this_thread::sleep_for(500ms);
+  std::shared_ptr<gui::WebHandler> pWebHandler;
+  if (opts.webUiPort > 0 && !opts.webUiHost.empty()) {
+    pWebHandler =
+        std::make_shared<gui::WebHandler>(opts.webUiPort, opts.webUiHost);
+    LOGGER->info("Web interface started at {}", pWebHandler->GetUrl());
+    pWebHandler->Start();
+    auto onMotionDetectorCallbackGui = [pWebHandler, pDetector,
+                                        pSource](detector::Payload data) {
+      (*pWebHandler)({.rois = data.rois,
+                      .frame = data.frame,
+                      .detail = pDetector->GetModel(),
+                      .fps = pSource->GetFramesPerSecond()});
+    };
+    pDetector->Subscribe(onMotionDetectorCallbackGui);
   }
+
+  exitSignalHandler.wpSource = pSource;
+
+  std::signal(SIGINT, SignalHandlerWrapper);
+  std::signal(SIGTERM, SignalHandlerWrapper);
+
+  pSource->StartStream();
 
   // At this point, performance is no longer critical as the feed is shut down,
   // send the last message using a synchronous handler
