@@ -32,7 +32,6 @@ TEST_P(TestHassHandler, CanPostBinarySensorUpdate) {
       EXPECT_EQ(std::future_status::ready,
                 SimServer::WaitForHassApiCount(startApiCalls + 2, 10s));
     });
-    watcher.join();
   }
 }
 
@@ -75,7 +74,7 @@ TEST_P(AsyncTestHassHandler, CanPostBinarySensorUpdate) {
   const std::string entityId{GetParam()};
   {
 
-    auto binarySensor = std::make_unique<home_assistant::AsyncHassHandler>(
+    auto binarySensor = std::make_shared<home_assistant::AsyncHassHandler>(
         SimServer::GetBaseUrl(), sim_token::bearer, entityId);
     binarySensor->debounceTime = 0s;
 
@@ -98,7 +97,6 @@ TEST_P(AsyncTestHassHandler, CanPostBinarySensorUpdate) {
     });
 
     pSched_->doEventLoop(&wv);
-    watcher.join();
   }
 }
 

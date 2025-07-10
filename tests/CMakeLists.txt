@@ -11,6 +11,7 @@ add_executable(MotionDetectionTests
   TestHassHandler.cxx
   TestProgramOptions.cxx
   TestMotionDetector.cxx
+  TestUtil.cxx
   TestVideoSource.cxx
   TestWebHandler.cxx
 )

@@ -121,7 +121,6 @@ void App(const util::ProgramOptions &opts) {
   pDetector->Subscribe(onMotionDetectorCallbackGui);
 
   pSource->InitStream();
-
   std::signal(SIGINT, SignalHandler);
   std::signal(SIGTERM, SignalHandler);
   while (!gExitFlag && pSource->IsActive()) {

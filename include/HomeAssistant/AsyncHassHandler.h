@@ -22,7 +22,8 @@ namespace home_assistant {
 
 using json = nlohmann::json;
 
-class AsyncHassHandler : public BaseHassHandler {
+class AsyncHassHandler : public BaseHassHandler,
+                         public std::enable_shared_from_this<AsyncHassHandler> {
 
 public:
   AsyncHassHandler(const boost::url &url, const std::string &token,
@@ -41,41 +42,40 @@ protected:
                         const json &attributes) override;
 
 private:
-  struct CurlMultiContext {
-    TaskScheduler *pSched_{nullptr};
-    AsyncHassHandler *pHandler{nullptr};
-    util::CurlMultiWrapper wCurlMulti_;
-    TaskToken token_{};
-  };
-  CurlMultiContext curlMultiCtx_;
+  TaskScheduler *pSched_{nullptr};
+  util::CurlMultiWrapper wCurlMulti_;
+  TaskToken token_{};
 
   struct CurlEasyContext {
-    TaskScheduler *pSched{nullptr};
     util::CurlWrapper wCurl;
     std::vector<char> inBuf;
     std::string outBuf;
     std::string_view outBufVw;
   };
 
-  struct CurlSocketContext {
+  struct CurlSocketContext : std::enable_shared_from_this<CurlSocketContext> {
     curl_socket_t sockfd{};
-    CurlMultiContext *pMultiContext{nullptr};
+    std::weak_ptr<AsyncHassHandler> pHandler;
   };
-  std::unordered_map<size_t, std::shared_ptr<CurlEasyContext>> ctxs_;
+  std::unordered_map<size_t, std::shared_ptr<CurlEasyContext>> easyCtxs_;
+  std::unordered_map<curl_socket_t, std::shared_ptr<CurlSocketContext>>
+      socketCtxs_;
 
   bool allowUpdate_{true};
 
   void GetInitialState();
+  void CheckMultiInfo();
 
   static int SocketCallback(CURL *easy, curl_socket_t s, int action,
-                            CurlMultiContext *mc, void *socketp);
-  static int TimeoutCallback(CURLM *multi, int timeoutMs, CurlMultiContext *mc);
+                            AsyncHassHandler *asyncHassHandler,
+                            CurlSocketContext *curlSocketContext);
+  static int TimeoutCallback(CURLM *multi, int timeoutMs,
+                             AsyncHassHandler *asyncHassHandler);
 
-  static void CheckMultiInfo(CurlMultiContext &mc);
-
-  static void BackgroundHandlerProc(void *clientData, int mask);
-  static void TimeoutHandlerProc(void *clientData);
-  static void DebounceUpdateProc(void *clientData);
+  static void BackgroundHandlerProc(void *curlSocketContext_clientData,
+                                    int mask);
+  static void TimeoutHandlerProc(void *asyncHassHandler_clientData);
+  static void DebounceUpdateProc(void *asyncHassHandler_clientData);
 };
 
 } // namespace home_assistant

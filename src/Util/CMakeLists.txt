@@ -3,6 +3,7 @@ add_library(Util SHARED
   CurlWrapper.cxx
   BufferOperations.cxx
   ProgramOptions.cxx
+  Tools.cxx
 )
 
 target_link_libraries(Util PUBLIC
