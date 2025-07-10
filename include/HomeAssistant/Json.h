@@ -1,5 +1,5 @@
 #ifndef INCLUDE_HOME_ASSISTANT_JSON_H
-#define INCLUDE_HOME_ASSISTATN_JSON_H
+#define INCLUDE_HOME_ASSISTANT_JSON_H
 
 #include <nlohmann/json.hpp>
 #include <opencv2/core/types.hpp>

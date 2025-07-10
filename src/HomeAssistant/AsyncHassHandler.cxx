@@ -47,7 +47,6 @@ int AsyncHassHandler::SocketCallback(CURL *easy, curl_socket_t s, int action,
       int flags{0};
       flags |= (action != CURL_POLL_IN) ? SOCKET_WRITABLE : 0;
       flags |= (action != CURL_POLL_OUT) ? SOCKET_READABLE : 0;
-
       pAhh->pSched_->setBackgroundHandling(
           s, flags, AsyncHassHandler::BackgroundHandlerProc, pCtx.get());
     } break;

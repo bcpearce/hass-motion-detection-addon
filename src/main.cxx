@@ -33,12 +33,14 @@ namespace {
 std::atomic_bool gExitFlag{false};
 } // namespace
 
-void SignalHandler(int signal) {
+void ThreadedSignalHandler(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
     LOGGER->info("Received signal {} closing stream...", signal);
     gExitFlag.store(true);
   }
 }
+
+void EventLoopSignalHandler(int signal) {}
 
 void App(const util::ProgramOptions &opts) {
 
@@ -121,8 +123,8 @@ void App(const util::ProgramOptions &opts) {
   pDetector->Subscribe(onMotionDetectorCallbackGui);
 
   pSource->InitStream();
-  std::signal(SIGINT, SignalHandler);
-  std::signal(SIGTERM, SignalHandler);
+  std::signal(SIGINT, ThreadedSignalHandler);
+  std::signal(SIGTERM, ThreadedSignalHandler);
   while (!gExitFlag && pSource->IsActive()) {
     std::this_thread::sleep_for(500ms);
   }

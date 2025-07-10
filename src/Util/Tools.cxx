@@ -1,6 +1,7 @@
 #include "Util/Tools.h"
 
 #include <algorithm>
+#include <cctype>
 #include <ranges>
 #include <string_view>
 
