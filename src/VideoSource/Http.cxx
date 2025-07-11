@@ -32,34 +32,29 @@ HttpVideoSource::HttpVideoSource(const boost::url &url,
                                  const std::string &username,
                                  const std::string &password)
     : HttpVideoSource(url) {
+  errBuf_.fill('\0');
   wCurl_(curl_easy_setopt, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST);
   wCurl_(curl_easy_setopt, CURLOPT_USERNAME, username.c_str());
   wCurl_(curl_easy_setopt, CURLOPT_PASSWORD, password.c_str());
 }
 
-void HttpVideoSource::InitStream() {
+void HttpVideoSource::StartStream(unsigned long long maxFrames) {
+  if (isActive_) {
+    throw std::runtime_error("HTTP stream is already running");
+  }
   isActive_ = true;
-  eventLoopThread_ =
-      std::jthread([this, url = url_](std::stop_token stopToken) {
-#ifdef _WIN32
-        SetThreadDescription(GetCurrentThread(), L"HTTP Stream Thread");
-#endif
-        while (!stopToken.stop_requested()) {
-          try {
-            GetNextFrame();
-          } catch (const std::exception &e) {
-            LOGGER->error("Error getting frame from {}: {}", url, e.what());
-          }
-          std::this_thread::sleep_for(delayBetweenFrames);
-        }
-        isActive_ = false;
-      });
+  while (isActive_.load() && GetFrameCount() < maxFrames) {
+    try {
+      GetNextFrame();
+    } catch (const std::exception &e) {
+      LOGGER->error("Error getting frame from {}: {}", url_, e.what());
+    }
+    std::this_thread::sleep_for(delayBetweenFrames);
+  }
+  isActive_ = false;
 }
 
-void HttpVideoSource::StopStream() {
-  eventLoopThread_.request_stop();
-  eventLoopThread_ = {};
-}
+void HttpVideoSource::StopStream() { isActive_.store(false); }
 
 Frame HttpVideoSource::GetNextFrame() {
   if (wCurl_) {

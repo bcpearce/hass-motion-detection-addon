@@ -31,7 +31,7 @@ public:
 
   template <typename F, typename... Ts> CURLcode call(F func, Ts... args) {
     const CURLcode res = func(pCurl_, args...);
-    if (res != CURLE_OK) {
+    if (res != CURLcode::CURLE_OK) {
       throw CurlError(
           std::format("Error {} calling CURL function {}: {}", int(res),
                       typeid(func).name(),

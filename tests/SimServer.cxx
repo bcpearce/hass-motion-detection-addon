@@ -59,7 +59,10 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
                mg_match(hm->uri, mg_str("/api/states/*"), entity_id)) {
 
       // handle auth
-      std::array<char, 256> user, pass;
+      std::array<char, 256> user;
+      std::array<char, 256> pass;
+      user.fill('\0');
+      pass.fill('\0');
       mg_http_creds(hm, user.data(), user.size(), pass.data(), pass.size());
       // expect bearer token for hass simulation
       if (std::string_view(user.data()).empty() &&
@@ -122,3 +125,15 @@ void SimServer::Stop() { listenerThread = {}; }
 const boost::url &SimServer::GetBaseUrl() { return url; }
 
 int SimServer::GetHassApiCount() { return hassApiCalls_.load(); }
+
+std::future_status
+SimServer::WaitForHassApiCount(int target, std::chrono::seconds timeout) {
+  auto fut = std::async(std::launch::async, [target] {
+    while (hassApiCalls_.load() != target) {
+      std::this_thread::yield();
+    }
+    return;
+  });
+  const auto res = fut.wait_for(timeout);
+  return res;
+}
