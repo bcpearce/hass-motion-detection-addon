@@ -35,5 +35,9 @@ repos:
       additional_dependencies: [ "ruamel.yaml" ]
       entry: python hooks/sync_version.py
       files: motion_detection_addon/config.yaml|VERSION
+- repo: https://github.com/cheshirekow/cmake-format-precommit
+  rev: v0.6.13
+  hooks:
+    - id: cmake-format
 
 ci: {}

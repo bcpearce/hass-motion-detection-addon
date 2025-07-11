@@ -2,7 +2,7 @@
 
 #include "Util/Tools.h"
 
-TEST(TestTools, TestNoCaseCmp) {
+TEST(ToolsTests, TestNoCaseCmp) {
   EXPECT_TRUE(util::NoCaseCmp("red", "RED"));
   EXPECT_TRUE(util::NoCaseCmp("rEd", "Red"));
   EXPECT_FALSE(util::NoCaseCmp("read", "rea"));
