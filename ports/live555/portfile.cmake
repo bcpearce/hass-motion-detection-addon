@@ -7,7 +7,7 @@ vcpkg_download_distfile(
   FILENAME
   "live555-latest.tar.gz"
   SHA512
-  4b2053ac83cceedf05dd778d56ee63b77e41a8a3dac086365bf8b91a7c9758c2eedc6d6ee5468fac3cec8e33b7b070cfa7401a4ec37f87346c940f56d4af63ac
+  1f2c970de72d0d4b7a8f26b9cc0acfecacc39629d1bd02b1731ceeb97ca51d58288c230342c19488e5faf082aa1c52143e4dd4d2f4b58d7ad37808b9b32c0546
 )
 
 vcpkg_extract_source_archive(
