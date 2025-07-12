@@ -137,7 +137,7 @@ int main(int argc, const char **argv) {
   try {
     auto stdoutLogger = logger::InitStderrLogger();
     auto stderrLogger = logger::InitStdoutLogger();
-    const util::ProgramOptions opts(argc, argv, true);
+    const util::ProgramOptions opts(argc, argv);
     App(opts);
   } catch (const std::exception &e) {
     ERR_LOGGER->critical(e.what());
