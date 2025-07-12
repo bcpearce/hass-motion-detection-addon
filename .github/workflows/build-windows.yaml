@@ -22,14 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install LLVM (Clang) 19
-        run: choco install llvm --version=19.1.5
+        run: choco install llvm --version=19.1.5 --allow-downgrade
+
       - name: Get VCPKG
         run: |
             git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
             cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+
       - name: Bootstrap vcpkg
         shell: pwsh
         run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+
       - name: Add NuGet sources
         shell: pwsh
         run: |
@@ -43,23 +46,37 @@ jobs:
           .$(${{ env.VCPKG_EXE }} fetch nuget) `
              setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" `
              -Source "${{ env.FEED_URL }}"
+
       - name: Generate and Configure Debug
         run: cmake . \
           --preset=Debug \
           -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
           -DCMAKE_CXX_COMPILER="clang++" \
           -DCMAKE_C_COMPILER="clang"
+
       - name: Build Debug
         run: cmake --build build/Debug
+
       - name: Test Debug
-        run: ./build/Debug/MotionDetectionTests --gtest_output=xml
+        run: ctest --output-junit test_detail_debug.xml --output-on-failure
+        working-directory: ./build/Debug
+
       - name: Generate and Configure Release
         run: cmake . \
           --preset=Release \
           -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
           -DCMAKE_CXX_COMPILER="clang++" \
           -DCMAKE_C_COMPILER="clang"
+
       - name: Build Release
         run: cmake --build build/Release
+
       - name: Test Release
-        run: ./build/Release/MotionDetectionTests --gtest_output=xml
+        run: ctest --output-junit test_detail_release.xml --output-on-failure
+        working-directory: ./build/Release
+
+      - name: Test Summary
+        uses: test-summary/action@v2
+        with:
+          paths: "test_detail_*.xml"
+        if: always()

@@ -28,17 +28,6 @@
     "spdlog"
   ],
   "features": {
-    "graphical-user-interface": {
-      "dependencies": [
-        {
-          "name": "opencv4",
-          "features": [
-            "highgui"
-          ]
-        }
-      ],
-      "description": "Show a graphical user interface while running."
-    },
     "tests": {
       "dependencies": [
         "gtest"

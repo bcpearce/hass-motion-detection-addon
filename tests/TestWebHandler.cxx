@@ -61,7 +61,7 @@ TEST(FilesystemTest, CanAccessPackedFilesystem) {
     wCurl(curl_easy_perform);
   }));
 
-  EXPECT_EQ(buf, expected);
+  EXPECT_EQ(std::string_view(buf), std::string_view(expected));
 
   wh.Stop();
 }

@@ -31,7 +31,7 @@ public:
 
   void operator()(Payload data);
 
-  struct BroadcastData {
+  struct BroadcastImageData {
     gsl::not_null<mg_mgr *> mgr;
     std::vector<uint8_t> jpgBuf;
     gsl::not_null<std::shared_mutex *> mtx;
@@ -49,11 +49,11 @@ private:
 
   std::shared_mutex imageMtx_;
   std::vector<uint8_t> imageJpeg_;
-  BroadcastData imageBroadcastData_{&mgr_, {}, &imageMtx_, 'L'};
+  BroadcastImageData imageBroadcastData_{&mgr_, {}, &imageMtx_, 'L'};
 
   std::shared_mutex modelMtx_;
   std::vector<uint8_t> modelJpeg_;
-  BroadcastData modelBroadcastData_{&mgr_, {}, &modelMtx_, 'M'};
+  BroadcastImageData modelBroadcastData_{&mgr_, {}, &modelMtx_, 'M'};
 };
 
 } // namespace gui

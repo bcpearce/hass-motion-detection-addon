@@ -1,6 +1,8 @@
 #include "Logger.h"
 #include "WindowsWrapper.h"
 
+#include <BasicUsageEnvironment.hh>
+
 #include "VideoSource/Live555.h"
 
 #include <format>
@@ -108,7 +110,7 @@ struct StreamClientState {
   MediaSession *session{nullptr};
   MediaSubsession *subsession{nullptr};
   VideoSource *pVideoSource{nullptr};
-  TaskToken streamTimerTask;
+  TaskToken streamTimerTask{nullptr};
   double duration{0.0};
 
   ~StreamClientState() {
@@ -257,7 +259,11 @@ private:
                                 timeStamp);
     }
 
-    continuePlaying();
+    if (rVideoSource_.GetFrameCount() < rVideoSource_.maxFrames_) {
+      continuePlaying();
+    } else {
+      rVideoSource_.StopStream();
+    }
   }
 
   static void AfterGettingFrame(void *clientData, unsigned int frameSize,
@@ -301,19 +307,25 @@ Live555VideoSource::Live555VideoSource(const boost::url &url,
     url_.set_user(username);
     url_.set_password(password);
   }
+  pScheduler_ = BasicTaskScheduler::createNew();
 }
 
 Live555VideoSource::~Live555VideoSource() {
   eventLoopWatchVar_.store(1);
   shutdownStream(pRtspClient_.release());
+  if (pEnv_) {
+    pEnv_->reclaim();
+  }
+  if (pScheduler_) {
+    delete pScheduler_;
+  }
 }
 
-void Live555VideoSource::InitStream() {
+void Live555VideoSource::StartStream(unsigned long long maxFrames) {
   if (url_.empty()) {
     throw std::runtime_error("No URL specified");
   }
 
-  pScheduler_ = BasicTaskScheduler::createNew();
   pEnv_ = BasicUsageEnvironment::createNew(*pScheduler_);
 
 // Open URL and establish connection
@@ -332,19 +344,11 @@ void Live555VideoSource::InitStream() {
   }
   pRtspClient_->sendDescribeCommand(continueAfterDESCRIBE);
   eventLoopWatchVar_ = 0;
-
-  eventLoopThread_ = std::jthread([this] {
-#ifdef _WIN32
-    SetThreadDescription(GetCurrentThread(), L"Live555 Stream Thread");
-#endif
-    pEnv_->taskScheduler().doEventLoop(&eventLoopWatchVar_);
-  });
+  maxFrames_ = maxFrames;
+  pEnv_->taskScheduler().doEventLoop(&eventLoopWatchVar_);
 }
 
-void Live555VideoSource::StopStream() {
-  eventLoopWatchVar_.store(1);
-  eventLoopThread_ = {};
-}
+void Live555VideoSource::StopStream() { eventLoopWatchVar_.store(1); }
 
 void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
                                      int strideY, int strideUV, int timeStamp) {

@@ -5,6 +5,7 @@
 
 #include <boost/url.hpp>
 
+#include "spdlog/sinks/callback_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
@@ -14,19 +15,27 @@
 namespace logger {
 
 inline auto InitStdoutLogger() {
-  auto logger = spdlog::stderr_color_mt("console");
+  if (!LOGGER) {
+    auto logger = spdlog::stderr_color_mt("console");
 #if _DEBUG
-  logger->set_level(spdlog::level::debug);
+    logger->set_level(spdlog::level::debug);
 #endif
-  return logger;
+    return logger;
+  } else {
+    return LOGGER;
+  }
 }
 
 inline auto InitStderrLogger() {
-  auto logger = spdlog::stderr_color_mt("error");
+  if (!ERR_LOGGER) {
+    auto logger = spdlog::stderr_color_mt("error");
 #if _DEBUG
-  logger->set_level(spdlog::level::debug);
+    logger->set_level(spdlog::level::debug);
 #endif
-  return logger;
+    return logger;
+  } else {
+    return ERR_LOGGER;
+  }
 }
 
 } // namespace logger
