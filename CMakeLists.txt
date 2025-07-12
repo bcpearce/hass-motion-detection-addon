@@ -56,17 +56,11 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-find_package(unofficial-mongoose REQUIRED)
-target_link_libraries(Gui PUBLIC Detector unofficial::mongoose::mongoose
-                                 VideoSource)
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/.env)
-  add_custom_command(
-    TARGET MotionDetection
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/.env
-            $<TARGET_FILE_DIR:MotionDetection>/.env)
-endif()
+add_subdirectory(src/Detector)
+add_subdirectory(src/Gui)
+add_subdirectory(src/HomeAssistant)
+add_subdirectory(src/Util)
+add_subdirectory(src/VideoSource)
 
 set(PROJECT_SHARED_LIBS "Detector;Gui;HomeAssistant;Util;VideoSource")
 
