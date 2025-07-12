@@ -59,7 +59,6 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 find_package(unofficial-mongoose REQUIRED)
 target_link_libraries(Gui PUBLIC Detector unofficial::mongoose::mongoose
                                  VideoSource)
-endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/.env)
   add_custom_command(
