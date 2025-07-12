@@ -17,7 +17,7 @@ namespace po = boost::program_options;
 
 namespace util {
 
-ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
+ProgramOptions::ProgramOptions(int argc, const char **argv) {
   po::options_description desc("Allowed options");
 
   desc.add_options()
@@ -100,6 +100,7 @@ ProgramOptions::ProgramOptions(int argc, const char **argv, bool loadDotEnv) {
                              {"URL"s, "source-url"s},
                              {"HASS_URL"s, "hass-url"s},
                              {"HASS_ENTITY_ID"s, "hass-entity-id"s},
+                             {"HASS_TOKEN"s, "hass-token"},
                              {"HASS_FRIENDLY_NAME"s, "hass-friendly-name"s},
                              {"WEB_UI_HOST"s, "web-ui-host"s},
                              {"WEB_UI_PORT"s, "web-ui-port"s},

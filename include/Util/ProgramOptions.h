@@ -11,7 +11,7 @@ namespace util {
 
 struct ProgramOptions {
   ProgramOptions() noexcept = default;
-  ProgramOptions(int argc, const char **argv, bool loadDotEnv = true);
+  ProgramOptions(int argc, const char **argv);
   boost::url url;
   std::string token;
   std::string username;

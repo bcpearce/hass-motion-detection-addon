@@ -43,9 +43,8 @@ find_package(OpenSSL CONFIG REQUIRED)
 find_package(OpenH264 REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
-add_executable(
-  MotionDetection include/Logger.h include/WindowsWrapper.h src/main.cxx
-                  "include/HomeAssistant/SyncHassHandler.h")
+add_executable(MotionDetection include/Logger.h include/WindowsWrapper.h
+                               src/main.cxx)
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/.env)
   add_custom_command(

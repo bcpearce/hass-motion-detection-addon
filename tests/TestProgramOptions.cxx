@@ -40,3 +40,21 @@ TEST(ProgramOptionsTests, CanSetupHass) {
   const util::ProgramOptions progOptsTrue(9, argvTrue);
   EXPECT_TRUE(progOptsTrue.CanSetupHass());
 }
+
+TEST(ProgramOptionsTests, CanSetupHassWithEnvironmentVariables) {
+#if _WIN32
+  EXPECT_EQ(0, _putenv_s("HASS_URL", "https://homeassistant.example.com:8123"));
+  EXPECT_EQ(0, _putenv_s("HASS_ENTITY_ID", "binary_sensor.test_binary_sensor"));
+  EXPECT_EQ(0, _putenv_s("HASS_TOKEN", "test_hass_token"));
+#elif __linux__
+  EXPECT_EQ(0, setenv("HASS_URL", "https://homeassistant.example.com:8123", 1));
+  EXPECT_EQ(0, setenv("HASS_ENTITY_ID", "binary_sensor.test_binary_sensor", 1));
+  EXPECT_EQ(0, setenv("HASS_TOKEN", "test_hass_token", 1));
+#endif
+
+  static const char *argv[3] = {PROJECT_NAME, "--source-url",
+                                "rtsp://feed.example.com:554"};
+
+  const util::ProgramOptions fromEnv(3, argv);
+  EXPECT_TRUE(fromEnv.CanSetupHass());
+}

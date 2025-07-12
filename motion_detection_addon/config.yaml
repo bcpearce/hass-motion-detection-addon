@@ -1,6 +1,6 @@
 name: "Motion Detection Add-On"
 description: "Add motion detection sensors to RTSP feeds"
-version: "0.6.0"
+version: "0.6.1"
 slug: "motion_detection_addon"
 init: false
 arch:
