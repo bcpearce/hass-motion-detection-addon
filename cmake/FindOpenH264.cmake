@@ -1,11 +1,9 @@
-# - Try to find the OpenH264 library
-# Once done this will define
+# * Try to find the OpenH264 library Once done this will define
 #
-#  OPENH264_ROOT - A list of search hints
+# OPENH264_ROOT - A list of search hints
 #
-#  OPENH264_FOUND - system has OpenH264
-#  OPENH264_INCLUDE_DIR - the OpenH264 include directory
-#  OPENH264_LIBRARIES - libopenh264 library
+# OPENH264_FOUND - system has OpenH264 OPENH264_INCLUDE_DIR - the OpenH264
+# include directory OPENH264_LIBRARIES - libopenh264 library
 
 if(UNIX AND NOT ANDROID)
   find_package(PkgConfig QUIET)
@@ -16,16 +14,20 @@ if(OPENH264_INCLUDE_DIR AND OPENH264_LIBRARY)
   set(OPENH264_FIND_QUIETLY TRUE)
 endif(OPENH264_INCLUDE_DIR AND OPENH264_LIBRARY)
 
-find_path(OPENH264_INCLUDE_DIR NAMES wels/codec_api.h wels/codec_app_def.h wels/codec_def.h PATH_SUFFIXES include
-          HINTS ${OPENH264_ROOT} ${PC_OPENH264_INCLUDE_DIRS}
-)
+find_path(
+  OPENH264_INCLUDE_DIR
+  NAMES wels/codec_api.h wels/codec_app_def.h wels/codec_def.h
+  PATH_SUFFIXES include
+  HINTS ${OPENH264_ROOT} ${PC_OPENH264_INCLUDE_DIRS})
 find_library(
-  OPENH264_LIBRARY NAMES openh264_dll openh264 welsdec PATH_SUFFIXES lib HINTS ${OPENH264_ROOT}
-                                                                               ${PC_OPENH264_LIBRARY_DIRS}
-)
+  OPENH264_LIBRARY
+  NAMES openh264_dll openh264 welsdec
+  PATH_SUFFIXES lib
+  HINTS ${OPENH264_ROOT} ${PC_OPENH264_LIBRARY_DIRS})
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(OpenH264 DEFAULT_MSG OPENH264_LIBRARY OPENH264_INCLUDE_DIR)
+find_package_handle_standard_args(OpenH264 DEFAULT_MSG OPENH264_LIBRARY
+                                  OPENH264_INCLUDE_DIR)
 
 if(OPENH264_INCLUDE_DIR AND OPENH264_LIBRARY)
   set(OPENH264_FOUND TRUE)

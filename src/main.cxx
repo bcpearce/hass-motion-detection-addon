@@ -18,35 +18,40 @@
 #include <spdlog/spdlog.h>
 
 #include "Detector/MotionDetector.h"
-#include "HomeAssistant/HassHandler.h"
+#include "Gui/WebHandler.h"
+#include "HomeAssistant/AsyncHassHandler.h"
+#include "HomeAssistant/SyncHassHandler.h"
+#include "HomeAssistant/ThreadedHassHandler.h"
 #include "Util/ProgramOptions.h"
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
 #include "VideoSource/VideoSource.h"
 
-#ifdef USE_GRAPHICAL_USER_INTERFACE
-#include "Gui/GuiHandler.h"
-#include <opencv2/highgui.hpp>
-#ifdef __linux__
-#include <X11/Xlib.h>
-#endif
-#else
-#include "Gui/WebHandler.h"
-#endif
-
 using namespace std::string_view_literals;
 using namespace std::chrono_literals;
 
 namespace {
-std::atomic_bool gExitFlag{false};
+struct ExitSignalHandler {
+  std::weak_ptr<video_source::VideoSource> wpSource;
+  void operator()(int signal) {
+    if (signal == SIGINT || signal == SIGTERM) {
+      LOGGER->info("Received signal {} closing stream...", signal);
+      if (auto spSource = wpSource.lock()) {
+        spSource->StopStream();
+      }
+    }
+  }
+};
+
+static ExitSignalHandler exitSignalHandler;
+
+void SignalHandlerWrapper(int signal) {
+  exitSignalHandler(signal); // Call the functor's operator()
+}
+
 } // namespace
 
-void SignalHandler(int signal) {
-  if (signal == SIGINT || signal == SIGTERM) {
-    LOGGER->info("Received signal {} closing stream...", signal);
-    gExitFlag.store(true);
-  }
-}
+void EventLoopSignalHandler(int signal) {}
 
 void App(const util::ProgramOptions &opts) {
 
@@ -81,12 +86,30 @@ void App(const util::ProgramOptions &opts) {
 
   pSource->Subscribe(onFrameCallback);
 
-  std::shared_ptr<home_assistant::HassHandler> pHassHandler;
+  std::shared_ptr<home_assistant::BaseHassHandler> pHassHandler;
   if (opts.CanSetupHass()) {
     LOGGER->info("Setting up Home Assistant status update for {} hosted at {}",
                  opts.hassEntityId, opts.hassUrl);
-    pHassHandler = home_assistant::HassHandler::Create(
-        opts.hassUrl, opts.hassToken, opts.hassEntityId);
+    if (std::dynamic_pointer_cast<video_source::HttpVideoSource>(pSource)) {
+      // Require Threaded
+      LOGGER->info("Running Home Assistant callbacks in separate thread");
+      auto pThreadedHassHandler =
+          std::make_shared<home_assistant::ThreadedHassHandler>(
+              opts.hassUrl, opts.hassToken, opts.hassEntityId);
+
+      pThreadedHassHandler->Start();
+      pHassHandler = pThreadedHassHandler;
+    } else if (auto pLive555Source =
+                   std::dynamic_pointer_cast<video_source::Live555VideoSource>(
+                       pSource)) {
+      // Optimize with Async
+      LOGGER->info("Running Home Assistant callbacks in main event loop");
+      auto pAsyncHassHandler =
+          std::make_shared<home_assistant::AsyncHassHandler>(
+              opts.hassUrl, opts.hassToken, opts.hassEntityId);
+      pAsyncHassHandler->Register(pLive555Source->GetTaskSchedulerPtr());
+      pHassHandler = pAsyncHassHandler;
+    }
 
     pHassHandler->friendlyName = opts.hassFriendlyName;
     pHassHandler->debounceTime = opts.detectionDebounce;
@@ -96,41 +119,38 @@ void App(const util::ProgramOptions &opts) {
           pHassHandler->operator()(data.rois);
         };
     pDetector->Subscribe(onMotionDetectionCallbackHass);
-    pHassHandler->Start();
   }
 
-#ifdef USE_GRAPHICAL_USER_INTERFACE
-  gui::GuiHandler gh;
-#else
-  gui::WebHandler gh(opts.webUiPort, opts.webUiHost);
-  LOGGER->info("Web interface started at {}", gh.GetUrl());
-  gh.Start();
-#endif
-  auto onMotionDetectorCallbackGui = [&gh, pDetector,
-                                      pSource](detector::Payload data) {
-    gh({.rois = data.rois,
-        .frame = data.frame,
-        .detail = pDetector->GetModel(),
-        .fps = pSource->GetFramesPerSecond()});
-  };
-  pDetector->Subscribe(onMotionDetectorCallbackGui);
-
-  pSource->InitStream();
-
-#ifdef USE_GRAPHICAL_USER_INTERFACE
-  do {
-    cv::imshow(gh.windowName, gh.canvas);
-  } while (cv::waitKey(33) < 0);
-  pSource->StopStream();
-#else
-  std::signal(SIGINT, SignalHandler);
-  std::signal(SIGTERM, SignalHandler);
-  while (!gExitFlag && pSource->IsActive()) {
-    std::this_thread::sleep_for(1s);
+  std::shared_ptr<gui::WebHandler> pWebHandler;
+  if (opts.webUiPort > 0 && !opts.webUiHost.empty()) {
+    pWebHandler =
+        std::make_shared<gui::WebHandler>(opts.webUiPort, opts.webUiHost);
+    LOGGER->info("Web interface started at {}", pWebHandler->GetUrl());
+    pWebHandler->Start();
+    auto onMotionDetectorCallbackGui = [pWebHandler, pDetector,
+                                        pSource](detector::Payload data) {
+      (*pWebHandler)({.rois = data.rois,
+                      .frame = data.frame,
+                      .detail = pDetector->GetModel(),
+                      .fps = pSource->GetFramesPerSecond()});
+    };
+    pDetector->Subscribe(onMotionDetectorCallbackGui);
   }
-#endif
 
-  (*pHassHandler)();
+  exitSignalHandler.wpSource = pSource;
+
+  std::signal(SIGINT, SignalHandlerWrapper);
+  std::signal(SIGTERM, SignalHandlerWrapper);
+
+  pSource->StartStream();
+
+  // At this point, performance is no longer critical as the feed is shut down,
+  // send the last message using a synchronous handler
+  if (opts.CanSetupHass()) {
+    home_assistant::SyncHassHandler syncHandler(opts.hassUrl, opts.hassToken,
+                                                opts.hassEntityId);
+    syncHandler({});
+  }
 }
 
 int main(int argc, const char **argv) {

@@ -16,22 +16,17 @@ TEST(HttpVideoSourceTests, TestReceiveFrame) {
     url.set_params({{"width", "640"}, {"height", "480"}});
     video_source::HttpVideoSource http(url);
 
-    std::atomic_bool stopStreamFlag{false};
-
     auto handler = [&](const video_source::Frame &frame) {
       EXPECT_FALSE(frame.img.empty());
       EXPECT_EQ(640, frame.img.cols);
       EXPECT_EQ(480, frame.img.rows);
-      stopStreamFlag.store(true);
-      stopStreamFlag.notify_all();
+      EXPECT_NO_THROW(http.StopStream());
     };
 
     http.Subscribe(handler);
     http.timeout = 5s;
 
-    EXPECT_NO_THROW(http.InitStream());
-    stopStreamFlag.wait(false);
-    EXPECT_NO_THROW(http.StopStream());
+    EXPECT_NO_THROW(http.StartStream());
   } catch (const std::exception &e) {
     FAIL() << "Exception thrown: " << e.what();
   }
@@ -39,5 +34,5 @@ TEST(HttpVideoSourceTests, TestReceiveFrame) {
 
 TEST(Live555VideoSourceTests, Smoke) {
   video_source::Live555VideoSource live555(boost::url(""));
-  EXPECT_THROW(live555.InitStream(), std::runtime_error);
+  EXPECT_THROW(live555.StartStream(0), std::runtime_error);
 }

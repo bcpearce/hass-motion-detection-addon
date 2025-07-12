@@ -1,14 +1,26 @@
 #include "WindowsWrapper.h"
 
+#include "Logger.h"
+
 #include "Gui/WebHandler.h"
 
+#include <barrier>
 #include <filesystem>
 #include <iostream>
+
+#define JSON_USE_IMPLICIT_CONVERSIONS 0
+#include <nlohmann/json.hpp>
 
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+using json = nlohmann::json;
+
 namespace {
+
+static std::atomic_bool broadcastLogs{false};
+static struct mg_mgr *pMgr{nullptr};
+static unsigned long parentConnId{0};
 
 static constexpr const char *mjpegHeaders =
     "HTTP/1.0 200 OK\r\n"
@@ -16,7 +28,7 @@ static constexpr const char *mjpegHeaders =
     "Pragma: no-cache\r\n"
     "Content-Type: multipart/x-mixed-replace; boundary=--boundary\r\n\r\n";
 
-void BroadcastMjpegFrame(gui::WebHandler::BroadcastData *broadcastData) {
+void BroadcastMjpegFrame(gui::WebHandler::BroadcastImageData *broadcastData) {
 
   mg_mgr *mgr = broadcastData->mgr;
   std::vector<uint8_t> &jpgBuf = broadcastData->jpgBuf;
@@ -36,15 +48,23 @@ void BroadcastMjpegFrame(gui::WebHandler::BroadcastData *broadcastData) {
   }
 }
 
-static void TimerCallback(void *arg) {
+static void BroadcastImage_TimerCallback(void *arg) {
   if (arg) {
-    BroadcastMjpegFrame(static_cast<gui::WebHandler::BroadcastData *>(arg));
+    BroadcastMjpegFrame(
+        static_cast<gui::WebHandler::BroadcastImageData *>(arg));
   }
 }
 
 // HTTP server event handler function
 void EventHandler(mg_connection *c, int ev, void *ev_data) {
   switch (ev) {
+  case MG_EV_OPEN:
+    if (c->is_listening) {
+      pMgr = c->mgr;
+      parentConnId = c->id;
+      broadcastLogs = true;
+    }
+    break;
   case MG_EV_HTTP_MSG: {
     mg_http_message *hm = (mg_http_message *)ev_data;
     if (mg_match(hm->uri, mg_str("/media/live"), nullptr)) {
@@ -53,6 +73,9 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
     } else if (mg_match(hm->uri, mg_str("/media/model"), nullptr)) {
       c->data[0] = 'M';
       mg_printf(c, "%s", mjpegHeaders);
+    } else if (mg_match(hm->uri, mg_str("/websocket"), nullptr)) {
+      mg_ws_upgrade(c, hm, nullptr);
+      c->data[0] = 'W';
     } else {
 #ifdef SERVE_UNPACKED
       // Use for testing, enables "hot reload" for resources in public folder
@@ -63,6 +86,14 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
       mg_http_serve_opts opts = {.root_dir = "/public", .fs = &mg_fs_packed};
 #endif
       mg_http_serve_dir(c, hm, &opts);
+    }
+  } break;
+  case MG_EV_WAKEUP: {
+    const std::string_view msg = *((std::string_view *)ev_data);
+    for (mg_connection *wc = c->mgr->conns; wc != nullptr; wc = wc->next) {
+      if (wc->data[0] == 'W') {
+        mg_ws_send(wc, msg.data(), msg.size(), WEBSOCKET_OP_TEXT);
+      }
     }
   } break;
   }
@@ -78,21 +109,50 @@ WebHandler::WebHandler(int port, std::string_view host) {
 }
 
 void WebHandler::Start() {
-  listenerThread_ = std::jthread([this](std::stop_token stopToken) {
+  std::barrier sync(2);
+  listenerThread_ = std::jthread([this, &sync](std::stop_token stopToken) {
+#ifdef _WIN32
+    SetThreadDescription(GetCurrentThread(), L"WebHandler Thread");
+#endif
 #ifdef _DEBUG
     mg_log_set(MG_LL_DEBUG);
 #endif
     mg_mgr_init(&mgr_);
-    mg_timer_add(&mgr_, 33, MG_TIMER_REPEAT, TimerCallback,
+    mg_timer_add(&mgr_, 33, MG_TIMER_REPEAT, BroadcastImage_TimerCallback,
                  &imageBroadcastData_);
-    mg_timer_add(&mgr_, 33, MG_TIMER_REPEAT, TimerCallback,
+    mg_timer_add(&mgr_, 33, MG_TIMER_REPEAT, BroadcastImage_TimerCallback,
                  &modelBroadcastData_);
+    mg_wakeup_init(&mgr_);
+    sync.arrive_and_drop();
     mg_http_listen(&mgr_, url_.c_str(), EventHandler, nullptr);
     while (!stopToken.stop_requested()) {
       mg_mgr_poll(&mgr_, 100);
     }
     mg_mgr_free(&mgr_);
   });
+
+  sync.arrive_and_wait();
+  auto pWebsocketSink = std::make_shared<spdlog::sinks::callback_sink_mt>(
+      [this](const spdlog::details::log_msg &msg) {
+        const auto levelSv =
+            std::string_view(spdlog::level::to_string_view(msg.level));
+        const auto msgSv = std::string_view(msg.payload);
+        thread_local json wsMsg = {};
+        thread_local std::string dumped;
+
+        wsMsg["level"] =
+            std::string_view(spdlog::level::to_string_view(msg.level));
+        wsMsg["payload"] = std::string_view(msg.payload);
+        wsMsg["timestamp"] = std::format("{}", msg.time);
+        dumped = wsMsg.dump();
+
+        if (broadcastLogs) {
+          mg_wakeup(pMgr, parentConnId, dumped.data(), dumped.size());
+        }
+      });
+
+  LOGGER->debug("Initializing WebSocket sink");
+  LOGGER->sinks().push_back(pWebsocketSink);
 }
 
 void WebHandler::Stop() { listenerThread_ = {}; }
