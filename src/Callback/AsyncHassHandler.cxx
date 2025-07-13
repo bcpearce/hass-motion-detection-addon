@@ -1,17 +1,15 @@
 #include "Logger.h"
 #include "WindowsWrapper.h"
 
-#include "HomeAssistant/AsyncHassHandler.h"
+#include "Callback/AsyncHassHandler.h"
 
-#include <iostream>
 #include <ranges>
 #include <string_view>
 
 #include <UsageEnvironment.hh>
 
-#include "HomeAssistant/Json.h"
+#include "Callback/Json.h"
 #include "Util/BufferOperations.h"
-#include "Util/CurlWrapper.h"
 #include "Util/Tools.h"
 
 using namespace std::string_literals;
@@ -21,14 +19,14 @@ namespace {
 static size_t contextId{1};
 } // namespace
 
-namespace home_assistant {
+namespace callback {
 int AsyncHassHandler::SocketCallback(CURL *easy, curl_socket_t s, int action,
                                      AsyncHassHandler *asyncHassHandler,
-                                     CurlSocketContext *curlSocketContext) {
+                                     _CurlSocketContext *curlSocketContext) {
   if (auto pAhh = asyncHassHandler->weak_from_this().lock()) {
-    std::shared_ptr<CurlSocketContext> pCtx;
+    std::shared_ptr<_CurlSocketContext> pCtx;
     if (curlSocketContext) {
-      pCtx = static_cast<CurlSocketContext *>(curlSocketContext)
+      pCtx = static_cast<_CurlSocketContext *>(curlSocketContext)
                  ->shared_from_this();
     };
     switch (action) {
@@ -36,7 +34,7 @@ int AsyncHassHandler::SocketCallback(CURL *easy, curl_socket_t s, int action,
     case CURL_POLL_OUT:
     case CURL_POLL_INOUT: {
       if (!pCtx) {
-        pCtx = std::make_shared<CurlSocketContext>();
+        pCtx = std::make_shared<_CurlSocketContext>();
         pCtx->sockfd = s;
         pCtx->pHandler = pAhh;
         pAhh->socketCtxs_[s] = pCtx; // save to the map for pointer preservation
@@ -98,9 +96,9 @@ void AsyncHassHandler::CheckMultiInfo() {
           char *effectiveMethod{nullptr};
           curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_METHOD, &effectiveMethod);
           if (util::NoCaseCmp(effectiveMethod, "GET")) {
-            HandleGetResponse(pCtx->wCurl, pCtx->inBuf);
+            HandleGetResponse(pCtx->wCurl, pCtx->writeData);
           } else if (util::NoCaseCmp(effectiveMethod, "POST")) {
-            HandlePostResponse(pCtx->wCurl, pCtx->inBuf);
+            HandlePostResponse(pCtx->wCurl, pCtx->writeData);
           }
         } catch (const std::exception &e) {
           LOGGER->error(e.what());
@@ -113,7 +111,7 @@ void AsyncHassHandler::CheckMultiInfo() {
       break;
     }
     default:
-      std::cerr << "CURLMSG default\n";
+      LOGGER->warn("CURLMSG default");
       break;
     }
   }
@@ -129,24 +127,24 @@ void AsyncHassHandler::BackgroundHandlerProc(void *curlSocketContext_clientData,
     if (mask & SOCKET_WRITABLE) {
       flags |= CURL_CSELECT_OUT;
     }
-    auto csc = static_cast<CurlSocketContext *>(curlSocketContext_clientData)
+    auto csc = static_cast<_CurlSocketContext *>(curlSocketContext_clientData)
                    ->shared_from_this();
-    if (auto ahh = csc->pHandler.lock()) {
+    if (auto pAhh = csc->pHandler.lock()) {
       int runningHandles{0};
-      ahh->wCurlMulti_(curl_multi_socket_action, csc->sockfd, flags,
-                       &runningHandles);
-      ahh->CheckMultiInfo();
+      pAhh->wCurlMulti_(curl_multi_socket_action, csc->sockfd, flags,
+                        &runningHandles);
+      pAhh->CheckMultiInfo();
     }
   }
 }
 
 void AsyncHassHandler::TimeoutHandlerProc(void *asyncHassHandler_clientData) {
   if (asyncHassHandler_clientData) {
-    auto ahh = static_cast<AsyncHassHandler *>(asyncHassHandler_clientData);
+    auto pAhh = static_cast<AsyncHassHandler *>(asyncHassHandler_clientData);
     int runningHandles{-1};
-    ahh->wCurlMulti_(curl_multi_socket_action, CURL_SOCKET_TIMEOUT, 0,
-                     &runningHandles);
-    ahh->CheckMultiInfo();
+    pAhh->wCurlMulti_(curl_multi_socket_action, CURL_SOCKET_TIMEOUT, 0,
+                      &runningHandles);
+    pAhh->CheckMultiInfo();
   }
 }
 
@@ -190,13 +188,12 @@ void AsyncHassHandler::UpdateState_Impl(std::string_view state,
   if (allowUpdate_ && stateChanging) {
     // insert and  get a reference to this
     // not thread safe
-    auto pCtx = std::make_shared<CurlEasyContext>();
+    auto pCtx = easyCtxs_[contextId++] = std::make_shared<_CurlEasyContext>();
 
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
-    PreparePostRequest(pCtx->wCurl, pCtx->inBuf, pCtx->outBuf);
+    PreparePostRequest(pCtx->wCurl, pCtx->writeData, pCtx->readData);
 
     wCurlMulti_(curl_multi_add_handle, pCtx->wCurl.pCurl_);
-    easyCtxs_[contextId++] = pCtx;
+    pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
 
     // debounce
     allowUpdate_ = false;
@@ -208,13 +205,12 @@ void AsyncHassHandler::UpdateState_Impl(std::string_view state,
 }
 
 void AsyncHassHandler::GetInitialState() {
-  auto pCtx = std::make_shared<CurlEasyContext>();
+  auto pCtx = easyCtxs_[contextId++] = std::make_shared<_CurlEasyContext>();
 
-  pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
-  PrepareGetRequest(pCtx->wCurl, pCtx->inBuf);
+  PrepareGetRequest(pCtx->wCurl, pCtx->writeData);
 
   wCurlMulti_(curl_multi_add_handle, pCtx->wCurl.pCurl_);
-  easyCtxs_[contextId++] = pCtx;
+  pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
 }
 
-} // namespace home_assistant
+} // namespace callback

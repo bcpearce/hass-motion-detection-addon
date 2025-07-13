@@ -3,7 +3,7 @@
 
 #include "Detector/Detector.h"
 
-#include "HomeAssistant/BaseHassHandler.h"
+#include "Callback/BaseHassHandler.h"
 
 #include <condition_variable>
 #include <memory>
@@ -16,7 +16,7 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
-namespace home_assistant {
+namespace callback {
 
 using json = nlohmann::json;
 
@@ -33,7 +33,7 @@ public:
   void Start();
   void Stop();
 
-  virtual ~ThreadedHassHandler() noexcept = default;
+  ~ThreadedHassHandler() noexcept override;
 
 protected:
   void UpdateState_Impl(std::string_view state,
@@ -46,6 +46,6 @@ private:
   std::jthread updaterThread_;
 };
 
-} // namespace home_assistant
+} // namespace callback
 
-#endif // INCLUDE_HOME_ASSISTANT_THREADED_HASS_HANDLER_H
+#endif // INCLUDE_CALLBACK_THREADED_HASS_HANDLER_H

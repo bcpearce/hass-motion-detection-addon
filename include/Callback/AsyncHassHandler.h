@@ -1,9 +1,8 @@
-#ifndef INCLUDE_HOME_ASSISTANT_ASYNC_HASS_HANDLER_H
-#define INCLUDE_HOME_ASSISTANT_ASYNC_HASS_HANDLER_H
+#ifndef INCLUDE_CALLBACK_ASYNC_HASS_HANDLER_H
+#define INCLUDE_CALLBACK_ASYNC_HASS_HANDLER_H
 
-#include "Detector/Detector.h"
-
-#include "HomeAssistant/BaseHassHandler.h"
+#include "Callback/BaseHassHandler.h"
+#include "Callback/Context.h"
 
 #include <memory>
 #include <string_view>
@@ -12,15 +11,10 @@
 #include <UsageEnvironment.hh>
 #include <boost/url.hpp>
 
-#define JSON_USE_IMPLICIT_CONVERSIONS 0
-#include <nlohmann/json.hpp>
-
 #include "Util/CurlMultiWrapper.h"
 #include "Util/CurlWrapper.h"
 
-namespace home_assistant {
-
-using json = nlohmann::json;
+namespace callback {
 
 class AsyncHassHandler : public BaseHassHandler,
                          public std::enable_shared_from_this<AsyncHassHandler> {
@@ -46,19 +40,10 @@ private:
   util::CurlMultiWrapper wCurlMulti_;
   TaskToken token_{};
 
-  struct CurlEasyContext {
-    util::CurlWrapper wCurl;
-    std::vector<char> inBuf;
-    std::string outBuf;
-    std::string_view outBufVw;
-  };
-
-  struct CurlSocketContext : std::enable_shared_from_this<CurlSocketContext> {
-    curl_socket_t sockfd{};
-    std::weak_ptr<AsyncHassHandler> pHandler;
-  };
-  std::unordered_map<size_t, std::shared_ptr<CurlEasyContext>> easyCtxs_;
-  std::unordered_map<curl_socket_t, std::shared_ptr<CurlSocketContext>>
+  using _CurlEasyContext = CurlEasyContext<std::vector<char>, std::string>;
+  using _CurlSocketContext = CurlSocketContext<AsyncHassHandler>;
+  std::unordered_map<size_t, std::shared_ptr<_CurlEasyContext>> easyCtxs_;
+  std::unordered_map<curl_socket_t, std::shared_ptr<_CurlSocketContext>>
       socketCtxs_;
 
   bool allowUpdate_{true};
@@ -68,7 +53,7 @@ private:
 
   static int SocketCallback(CURL *easy, curl_socket_t s, int action,
                             AsyncHassHandler *asyncHassHandler,
-                            CurlSocketContext *curlSocketContext);
+                            _CurlSocketContext *curlSocketContext);
   static int TimeoutCallback(CURLM *multi, int timeoutMs,
                              AsyncHassHandler *asyncHassHandler);
 
@@ -78,6 +63,6 @@ private:
   static void DebounceUpdateProc(void *asyncHassHandler_clientData);
 };
 
-} // namespace home_assistant
+} // namespace callback
 
 #endif //  INCLUDE_HOMEASSISTANT_HASS_HANDLER_H

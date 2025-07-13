@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <ranges>
 #include <span>
-#include <string_view>
+#include <string>
 #include <vector>
 
 namespace util {
@@ -29,7 +29,7 @@ size_t SendBufferCallback(char *dest, size_t sz, size_t nmemb,
   const size_t bufferSz = sz * nmemb;
 
   if (pUserData) {
-    std::string_view *buf = static_cast<std::string_view *>(pUserData);
+    std::string *buf = static_cast<std::string *>(pUserData);
     size_t copyThisMuch = std::min(bufferSz, buf->size());
     memcpy(dest, buf->data(), copyThisMuch);
 

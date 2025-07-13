@@ -6,9 +6,11 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
+#include <barrier>
 #include <filesystem>
 #include <format>
 
+using namespace std::chrono_literals;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
@@ -58,6 +60,7 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     } else if (mg_str entity_id[2];
                mg_match(hm->uri, mg_str("/api/states/*"), entity_id)) {
 
+      ++hassApiCalls_; // do before sending
       // handle auth
       std::array<char, 256> user;
       std::array<char, 256> pass;
@@ -91,7 +94,6 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
       } else {
         mg_http_reply(c, 401, "", "%s", "401: Unauthorized");
       }
-      ++hassApiCalls_;
     }
   }
 }
@@ -102,22 +104,25 @@ SimServer::SimServer(Token, int port) {
   url.set_port(std::to_string(port));
 }
 
-void SimServer::Start(int port) {
+void SimServer::Start(int port) noexcept {
   if (!pServer || url.port_number() != port) {
     pServer = std::make_unique<SimServer>(Token(), port);
   }
-  listenerThread = std::jthread([](std::stop_token stopToken) {
+  std::barrier sync(2);
+  listenerThread = std::jthread([&sync](std::stop_token stopToken) {
     struct mg_mgr mgr;
 #ifdef _DEBUG
     mg_log_set(MG_LL_DEBUG);
 #endif
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, url.c_str(), ev_handler, nullptr);
+    sync.arrive_and_drop();
     while (!stopToken.stop_requested()) {
       mg_mgr_poll(&mgr, 1000);
     }
     mg_mgr_free(&mgr);
   });
+  sync.arrive_and_wait();
 }
 
 void SimServer::Stop() { listenerThread = {}; }
@@ -126,14 +131,11 @@ const boost::url &SimServer::GetBaseUrl() { return url; }
 
 int SimServer::GetHassApiCount() { return hassApiCalls_.load(); }
 
-std::future_status
-SimServer::WaitForHassApiCount(int target, std::chrono::seconds timeout) {
-  auto fut = std::async(std::launch::async, [target] {
-    while (hassApiCalls_.load() != target) {
-      std::this_thread::yield();
-    }
-    return;
-  });
-  const auto res = fut.wait_for(timeout);
-  return res;
+int SimServer::WaitForHassApiCount(int target, std::chrono::seconds timeout) {
+  using sc = std::chrono::steady_clock;
+  int count = GetHassApiCount();
+  for (auto start = sc::now(); sc::now() - start < timeout && count != target;
+       count = GetHassApiCount())
+    ;
+  return count;
 }

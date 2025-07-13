@@ -56,13 +56,13 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+add_subdirectory(src/Callback)
 add_subdirectory(src/Detector)
 add_subdirectory(src/Gui)
-add_subdirectory(src/HomeAssistant)
 add_subdirectory(src/Util)
 add_subdirectory(src/VideoSource)
 
-set(PROJECT_SHARED_LIBS "Detector;Gui;HomeAssistant;Util;VideoSource")
+set(PROJECT_SHARED_LIBS "Detector;Gui;Callback;Util;VideoSource")
 
 target_link_libraries(
   MotionDetection PRIVATE ${PROJECT_SHARED_LIBS} opencv_core opencv_imgproc

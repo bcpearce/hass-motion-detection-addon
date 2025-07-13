@@ -17,11 +17,11 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
+#include "Callback/AsyncHassHandler.h"
+#include "Callback/SyncHassHandler.h"
+#include "Callback/ThreadedHassHandler.h"
 #include "Detector/MotionDetector.h"
 #include "Gui/WebHandler.h"
-#include "HomeAssistant/AsyncHassHandler.h"
-#include "HomeAssistant/SyncHassHandler.h"
-#include "HomeAssistant/ThreadedHassHandler.h"
 #include "Util/ProgramOptions.h"
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
@@ -86,7 +86,7 @@ void App(const util::ProgramOptions &opts) {
 
   pSource->Subscribe(onFrameCallback);
 
-  std::shared_ptr<home_assistant::BaseHassHandler> pHassHandler;
+  std::shared_ptr<callback::BaseHassHandler> pHassHandler;
   if (opts.CanSetupHass()) {
     LOGGER->info("Setting up Home Assistant status update for {} hosted at {}",
                  opts.hassEntityId, opts.hassUrl);
@@ -94,7 +94,7 @@ void App(const util::ProgramOptions &opts) {
       // Require Threaded
       LOGGER->info("Running Home Assistant callbacks in separate thread");
       auto pThreadedHassHandler =
-          std::make_shared<home_assistant::ThreadedHassHandler>(
+          std::make_shared<callback::ThreadedHassHandler>(
               opts.hassUrl, opts.hassToken, opts.hassEntityId);
 
       pThreadedHassHandler->Start();
@@ -104,9 +104,8 @@ void App(const util::ProgramOptions &opts) {
                        pSource)) {
       // Optimize with Async
       LOGGER->info("Running Home Assistant callbacks in main event loop");
-      auto pAsyncHassHandler =
-          std::make_shared<home_assistant::AsyncHassHandler>(
-              opts.hassUrl, opts.hassToken, opts.hassEntityId);
+      auto pAsyncHassHandler = std::make_shared<callback::AsyncHassHandler>(
+          opts.hassUrl, opts.hassToken, opts.hassEntityId);
       pAsyncHassHandler->Register(pLive555Source->GetTaskSchedulerPtr());
       pHassHandler = pAsyncHassHandler;
     }
@@ -147,8 +146,8 @@ void App(const util::ProgramOptions &opts) {
   // At this point, performance is no longer critical as the feed is shut down,
   // send the last message using a synchronous handler
   if (opts.CanSetupHass()) {
-    home_assistant::SyncHassHandler syncHandler(opts.hassUrl, opts.hassToken,
-                                                opts.hassEntityId);
+    callback::SyncHassHandler syncHandler(opts.hassUrl, opts.hassToken,
+                                          opts.hassEntityId);
     syncHandler({});
   }
 }

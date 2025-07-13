@@ -13,7 +13,7 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
-namespace home_assistant {
+namespace callback {
 
 using json = nlohmann::json;
 
@@ -63,6 +63,6 @@ private:
   json nextState_ = {};
 };
 
-} // namespace home_assistant
+} // namespace callback
 
 #endif //  INCLUDE_HOMEASSISTANT_HASS_HANDLER_H

@@ -1,3 +1,9 @@
+#include "WindowsWrapper.h"
+
+#ifdef __linux__
+#include <stdlib.h>
+#endif
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 

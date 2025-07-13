@@ -12,8 +12,8 @@ add_executable(
   main.cxx
   SimServer.cxx
   SimServer.h
+  TestCallback.cxx
   TestCurlWrapper.cxx
-  TestHassHandler.cxx
   TestProgramOptions.cxx
   TestMotionDetector.cxx
   TestUtil.cxx
@@ -22,9 +22,9 @@ add_executable(
 
 target_link_libraries(
   ${TEST_PROJECT}
-  PRIVATE Detector
+  PRIVATE Callback
+          Detector
           Gui
-          HomeAssistant
           nlohmann_json::nlohmann_json
           unofficial::mongoose::mongoose
           Util
