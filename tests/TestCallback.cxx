@@ -202,4 +202,6 @@ TEST_F(TestAsyncFileSave, CanSaveAnImage) {
     EXPECT_FALSE(cv::imread(fs.string(), cv::IMREAD_UNCHANGED).empty())
         << "Could not read downloaded image back at " << fs.string();
   }
+
+  EXPECT_EQ(asyncFileSave->GetPendingFileOperations(), 0);
 }

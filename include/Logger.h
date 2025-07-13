@@ -1,5 +1,4 @@
-#ifndef INCLUDE_LOGGER_H
-#define INCLUDE_LOGGER_H
+#pragma once
 
 #include <string_view>
 
@@ -51,5 +50,3 @@ struct fmt::formatter<boost::url> : fmt::formatter<std::string_view> {
                           std::string_view(url.data(), url.size()));
   }
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef INCLUDE_HOME_ASSISTANT_SYNC_HASS_HANDLER_H
-#define INCLUDE_HOME_ASSISTANT_SYNC_HASS_HANDLER_H
+#pragma once
 
 #include "Detector/Detector.h"
 
@@ -36,5 +35,3 @@ private:
 };
 
 } // namespace callback
-
-#endif // INCLUDE_HOME_ASSISTANT_THREADED_HASS_HANDLER_H

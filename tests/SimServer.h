@@ -1,5 +1,4 @@
-#ifndef INCLUDE_SIMSERVER_H
-#define INCLUDE_SIMSERVER_H
+#pragma once
 
 #include <mongoose.h>
 
@@ -37,5 +36,3 @@ protected:
   SimServer(SimServer &&) = delete;
   SimServer &operator=(SimServer &&) = delete;
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef INCLUDE_GUI_WEBHANDLER_H
-#define INCLUDE_GUI_WEBHANDLER_H
+#pragma once
 
 #include "Gui/Payload.h"
 
@@ -57,5 +56,3 @@ private:
 };
 
 } // namespace gui
-
-#endif

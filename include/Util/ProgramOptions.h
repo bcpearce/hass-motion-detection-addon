@@ -1,5 +1,4 @@
-#ifndef INCLUDE_UTIL_PROGRAM_OPTIONS_H
-#define INCLUDE_UTIL_PROGRAM_OPTIONS_H
+#pragma once
 
 #include <string>
 #include <string_view>
@@ -32,5 +31,3 @@ struct ProgramOptions {
 };
 
 } // namespace util
-
-#endif

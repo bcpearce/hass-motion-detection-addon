@@ -128,7 +128,6 @@ void AsyncFileSave::CheckMultiInfo() {
 
         // cleanup
         wCurlMulti(curl_multi_remove_handle, pCtx->wCurl.pCurl_);
-        easyCtxs_.erase(it);
       }
       break;
     }
@@ -198,9 +197,14 @@ void AsyncFileSave::WriteFunction(char *contents, size_t sz, size_t nmemb,
 VOID CALLBACK AsyncFileSave::FileIOCompletionRoutine(
     __in DWORD dwErrorCode, __in DWORD dwNumberOfBytesTransferred,
     __in LPOVERLAPPED lpOverlapped) {
-  auto *pCtx = std::bit_cast<_CurlEasyContext *>(lpOverlapped->hEvent);
+  auto pCtx = static_cast<_CurlEasyContext *>(lpOverlapped->hEvent);
   if (!CloseHandle(pCtx->writeData.hFile)) {
     LOGGER->warn("Failed to close file");
+  } else {
+    LOGGER->info("Closed handle to {}", pCtx->writeData.hFile);
+  }
+  if (auto pHandler = pCtx->pHandler.lock()) {
+    pHandler->easyCtxs_.erase(pCtx->contextId);
   }
 }
 
@@ -238,7 +242,9 @@ void AsyncFileSave::InstallHandlers() {
 AsyncFileSave::AsyncFileSave(const boost::url &url, const std::string &user,
                              const std::string &password)
     : url_{url} {
+#ifdef __linux__
   InstallHandlers();
+#endif
   if (!user.empty()) {
     url_.set_user(user);
   }

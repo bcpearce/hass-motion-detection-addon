@@ -1,5 +1,4 @@
-#ifndef INCLUDE_CALLBACK_CONTEXT_H
-#define INCLUDE_CALLBACK_CONTEXT_H
+#pragma once
 
 #include <memory>
 #include <string>
@@ -26,5 +25,3 @@ struct CurlSocketContext
 };
 
 } // namespace callback
-
-#endif

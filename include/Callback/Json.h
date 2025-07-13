@@ -1,5 +1,4 @@
-#ifndef INCLUDE_HOME_ASSISTANT_JSON_H
-#define INCLUDE_HOME_ASSISTANT_JSON_H
+#pragma once
 
 #include <nlohmann/json.hpp>
 #include <opencv2/core/types.hpp>
@@ -21,5 +20,3 @@ inline void from_json(const nlohmann::json &j, cv::Rect &rect) {
 }
 
 } // namespace callback
-
-#endif

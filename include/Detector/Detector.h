@@ -1,5 +1,4 @@
-#ifndef INCLUDE_DETECTOR_H
-#define INCLUDE_DETECTOR_H
+#pragma once
 
 #include <span>
 #include <variant>
@@ -47,5 +46,3 @@ private:
 };
 
 } // namespace detector
-
-#endif

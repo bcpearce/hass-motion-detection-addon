@@ -9,6 +9,7 @@ include_directories(AFTER "${CMAKE_BINARY_DIR}/include")
 
 option(BUILD_TESTS "Build Tests" ON)
 if(BUILD_TESTS)
+  add_compile_definitions(BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
 endif()
 

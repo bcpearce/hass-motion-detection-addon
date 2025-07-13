@@ -1,5 +1,4 @@
-#ifndef INCLUDE_CALLBACK_ASYNC_HASS_HANDLER_H
-#define INCLUDE_CALLBACK_ASYNC_HASS_HANDLER_H
+#pragma once
 
 #include "Callback/BaseHassHandler.h"
 #include "Callback/Context.h"
@@ -64,5 +63,3 @@ private:
 };
 
 } // namespace callback
-
-#endif //  INCLUDE_HOMEASSISTANT_HASS_HANDLER_H

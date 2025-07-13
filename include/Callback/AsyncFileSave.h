@@ -1,5 +1,4 @@
-#ifndef INCLUDE_CALLBACK_ASYNC_FILE_SAVE_H
-#define INCLUDE_CALLBACK_ASYNC_FILE_SAVE_H
+#pragma once
 
 #include "WindowsWrapper.h"
 
@@ -37,6 +36,9 @@ public:
 
   void Register(TaskScheduler *pSched);
   void SaveFileAtEndpoint(const std::filesystem::path &dst);
+
+  size_t GetPendingRequestOperations() const { return socketCtxs_.size(); }
+  size_t GetPendingFileOperations() const { return easyCtxs_.size(); }
 
 private:
   boost::url url_;
@@ -97,5 +99,3 @@ private:
 };
 
 } // namespace callback
-
-#endif //  INCLUDE_HOMEASSISTANT_HASS_HANDLER_H
