@@ -26,7 +26,7 @@ public:
   AsyncHassHandler &operator=(const AsyncHassHandler &) = delete;
   AsyncHassHandler &operator=(AsyncHassHandler &&) = delete;
 
-  virtual ~AsyncHassHandler() noexcept = default;
+  virtual ~AsyncHassHandler() noexcept;
 
   void Register(TaskScheduler *pSched);
 
@@ -37,7 +37,7 @@ protected:
 private:
   TaskScheduler *pSched_{nullptr};
   util::CurlMultiWrapper wCurlMulti_;
-  TaskToken token_{};
+  TaskToken timeoutTaskToken_{};
 
   using _CurlEasyContext = CurlEasyContext<std::vector<char>, std::string>;
   using _CurlSocketContext = CurlSocketContext<AsyncHassHandler>;
@@ -46,6 +46,7 @@ private:
       socketCtxs_;
 
   bool allowUpdate_{true};
+  TaskToken debounceTaskToken_{};
 
   void GetInitialState();
   void CheckMultiInfo();

@@ -58,12 +58,12 @@ TEST_P(TestThreadedHassHandler, FailsWithoutBearerToken) {
 }
 
 void EndLoop(void *clientData) {
-  auto *wv = std::bit_cast<EventLoopWatchVariable *>(clientData);
+  auto *wv = static_cast<EventLoopWatchVariable *>(clientData);
   wv->store(1);
 }
 
 void Kickoff(void *clientData) {
-  auto *sync = std::bit_cast<std::barrier<> *>(clientData);
+  auto *sync = static_cast<std::barrier<> *>(clientData);
   sync->arrive_and_drop();
 }
 
@@ -155,15 +155,9 @@ protected:
   TaskScheduler *pSched_{nullptr};
   std::filesystem::path downloadDir_;
 
-  struct ClientData {
-    callback::AsyncFileSave *pAsyncFileSave{nullptr};
-    std::filesystem::path *pFilesystemPath{nullptr};
-  };
-
   static void DownloadFile(void *clientData) {
-    auto [pAsyncFileSave, pFilesystemPath] =
-        *std::bit_cast<ClientData *>(clientData);
-    pAsyncFileSave->SaveFileAtEndpoint(*pFilesystemPath);
+    auto *pAsyncFileSave = static_cast<callback::AsyncFileSave *>(clientData);
+    pAsyncFileSave->SaveFileAtEndpoint();
   }
 };
 
@@ -173,24 +167,17 @@ TEST_F(TestAsyncFileSave, CanSaveAnImage) {
   url.set_path("/api/getimage");
   url.set_params({{"width", "640"}, {"height", "480"}});
 
-  auto asyncFileSave = std::make_shared<callback::AsyncFileSave>(url);
+  auto asyncFileSave =
+      std::make_shared<callback::AsyncFileSave>(downloadDir_, url);
   asyncFileSave->Register(pSched_);
 
   const auto trigger = pSched_->createEventTrigger(EndLoop);
 
   static constexpr int imgCount{25};
 
-  std::list<std::filesystem::path> imgPaths;
-  std::list<ClientData> clientDatas;
-  for (auto &&fs : std::views::iota(1, imgCount + 1) |
-                       std::views::transform([&](const int i) {
-                         return downloadDir_ / std::format("{}.jpg", i);
-                       })) {
-    imgPaths.push_back(std::move(fs));
-    clientDatas.push_back({.pAsyncFileSave = asyncFileSave.get(),
-                           .pFilesystemPath = &imgPaths.back()});
+  for (int i{0}; i < imgCount; ++i) {
     pSched_->scheduleDelayedTask(0, TestAsyncFileSave::DownloadFile,
-                                 &clientDatas.back());
+                                 asyncFileSave.get());
   }
 
   EventLoopWatchVariable wv{0};
@@ -198,10 +185,11 @@ TEST_F(TestAsyncFileSave, CanSaveAnImage) {
 
   pSched_->doEventLoop(&wv);
 
-  for (const auto &fs : imgPaths) {
+  for (const auto &fs : asyncFileSave->GetSavedFilePaths()) {
     EXPECT_FALSE(cv::imread(fs.string(), cv::IMREAD_UNCHANGED).empty())
         << "Could not read downloaded image back at " << fs.string();
   }
 
+  EXPECT_EQ(asyncFileSave->GetPendingRequestOperations(), 0);
   EXPECT_EQ(asyncFileSave->GetPendingFileOperations(), 0);
 }

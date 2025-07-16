@@ -56,15 +56,17 @@ void EventLoopSignalHandler(int signal) {}
 void App(const util::ProgramOptions &opts) {
 
   std::shared_ptr<video_source::VideoSource> pSource{nullptr};
-  if (opts.url.scheme() == "http"sv || opts.url.scheme() == "https"sv) {
+  if (opts.sourceUrl.scheme() == "http"sv ||
+      opts.sourceUrl.scheme() == "https"sv) {
     pSource = std::make_shared<video_source::HttpVideoSource>(
-        opts.url, opts.username, opts.password);
-  } else if (opts.url.scheme() == "rtsp"sv) {
+        opts.sourceUrl, opts.sourceUsername, opts.sourcePassword);
+  } else if (opts.sourceUrl.scheme() == "rtsp"sv) {
     pSource = std::make_shared<video_source::Live555VideoSource>(
-        opts.url, opts.username, opts.password);
+        opts.sourceUrl, opts.sourceUsername, opts.sourcePassword);
   } else {
-    throw std::runtime_error(std::format("Invalid scheme {} for URL",
-                                         std::string_view(opts.url.scheme())));
+    throw std::runtime_error(
+        std::format("Invalid scheme {} for URL",
+                    std::string_view(opts.sourceUrl.scheme())));
   }
 
   auto pDetector = std::make_shared<detector::MOGMotionDetector>(
@@ -156,8 +158,12 @@ int main(int argc, const char **argv) {
   try {
     auto stdoutLogger = logger::InitStderrLogger();
     auto stderrLogger = logger::InitStdoutLogger();
-    const util::ProgramOptions opts(argc, argv);
-    App(opts);
+    const auto optsVar = util::ProgramOptions::ParseOptions(argc, argv);
+    if (std::holds_alternative<std::string>(optsVar)) {
+      std::cout << std::get<std::string>(optsVar) << "\n";
+    } else {
+      App(std::get<util::ProgramOptions>(optsVar));
+    }
   } catch (const std::exception &e) {
     ERR_LOGGER->critical(e.what());
     return EXIT_FAILURE;

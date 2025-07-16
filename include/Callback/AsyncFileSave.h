@@ -4,12 +4,14 @@
 
 #include "Callback/Context.h"
 
+#include <deque>
 #include <filesystem>
 #include <memory>
 #include <string_view>
 #include <unordered_map>
 
 #include <UsageEnvironment.hh>
+#include <boost/circular_buffer.hpp>
 #include <boost/url.hpp>
 
 #include "Util/CurlMultiWrapper.h"
@@ -25,23 +27,32 @@ namespace callback {
 class AsyncFileSave : public std::enable_shared_from_this<AsyncFileSave> {
 
 public:
-  AsyncFileSave(const boost::url &url, const std::string &user = {},
+  AsyncFileSave(const std::filesystem::path &dstPath,
+                const boost::url &url = {}, const std::string &user = {},
                 const std::string &password = {});
   AsyncFileSave(const AsyncFileSave &) = delete;
   AsyncFileSave(AsyncFileSave &&) = delete;
   AsyncFileSave &operator=(const AsyncFileSave &) = delete;
   AsyncFileSave &operator=(AsyncFileSave &&) = delete;
 
-  virtual ~AsyncFileSave() noexcept = default;
+  virtual ~AsyncFileSave() noexcept;
 
   void Register(TaskScheduler *pSched);
-  void SaveFileAtEndpoint(const std::filesystem::path &dst);
+  void SaveFileAtEndpoint();
 
   size_t GetPendingRequestOperations() const { return socketCtxs_.size(); }
   size_t GetPendingFileOperations() const { return easyCtxs_.size(); }
 
+  const boost::circular_buffer<std::filesystem::path> &
+  GetSavedFilePaths() const;
+
+  void SetLimitSavedFilePaths(size_t limit);
+
 private:
   boost::url url_;
+  std::filesystem::path dstPath_;
+
+  boost::circular_buffer<std::filesystem::path> savedFilePaths_{200};
 
   TaskScheduler *pSched_{nullptr};
   util::CurlMultiWrapper wCurlMulti_;
@@ -52,6 +63,7 @@ private:
     HANDLE hFile{nullptr};
     OVERLAPPED overlapped{};
     LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine{nullptr};
+    std::filesystem::path dstPath;
   };
   using _CurlEasyContext =
       CurlEasyContext<Win32Overlapped, void *, AsyncFileSave>;
@@ -59,6 +71,7 @@ private:
   struct LinuxAioFile {
     aiocb _aiocb{};
     std::vector<char> buf;
+    std::filesystem::path dstPath;
   };
   using _CurlEasyContext = CurlEasyContext<LinuxAioFile, void *, AsyncFileSave>;
 #endif
@@ -83,8 +96,8 @@ private:
   static void TimeoutHandlerProc(void *asyncFileSave_clientData);
   static void DebounceUpdateProc(void *asyncFileSave_clientData);
 
-  static void WriteFunction(char *contents, size_t sz, size_t nmemb,
-                            void *pUserData);
+  static size_t WriteFunction(char *contents, size_t sz, size_t nmemb,
+                              void *pUserData);
 
 #ifdef __linux__
   static void AioSigHandler(int sig, siginfo_t *si, void *ucontext);
