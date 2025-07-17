@@ -17,6 +17,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
+#include "Callback/AsyncFileSave.h"
 #include "Callback/AsyncHassHandler.h"
 #include "Callback/SyncHassHandler.h"
 #include "Callback/ThreadedHassHandler.h"
@@ -120,6 +121,27 @@ void App(const util::ProgramOptions &opts) {
           pHassHandler->operator()(data.rois);
         };
     pDetector->Subscribe(onMotionDetectionCallbackHass);
+  }
+
+  std::shared_ptr<callback::AsyncFileSave> pFileSaveHandler;
+  if (!opts.saveDestination.empty() && !opts.saveSourceUrl.empty()) {
+    if (auto pLive555Source =
+            std::dynamic_pointer_cast<video_source::Live555VideoSource>(
+                pSource)) {
+      pFileSaveHandler = std::make_shared<callback::AsyncFileSave>(
+          opts.saveDestination, opts.saveSourceUrl, opts.sourceUsername,
+          opts.sourcePassword);
+      pFileSaveHandler->SetLimitSavedFilePaths(10);
+      auto onMotionDetectionCallbackSave =
+          [pFileSaveHandler](detector::Payload data) {
+            if (data.rois.size() > 0) {
+              pFileSaveHandler->SaveFileAtEndpoint();
+            }
+          };
+
+      pFileSaveHandler->Register(pLive555Source->GetTaskSchedulerPtr());
+      pDetector->Subscribe(onMotionDetectionCallbackSave);
+    }
   }
 
   std::shared_ptr<gui::WebHandler> pWebHandler;

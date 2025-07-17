@@ -169,15 +169,17 @@ void BaseHassHandler::HandlePostResponse(util::CurlWrapper &wCurl,
   default: {
     char *ct{nullptr};
     wCurl(curl_easy_getinfo, CURLINFO_CONTENT_TYPE, &ct);
-    std::string_view ctVw{ct};
-    std::string_view contentTypeDesc =
-        ("application/xml"sv == ctVw || "application/json"sv == ctVw ||
-         ctVw.starts_with("text"))
-            ? std::string_view(buf.data(), buf.size())
-            : ""sv;
-    throw std::runtime_error(
-        std::format("Failed to update entity {} status with code {}: {}",
-                    entityId, code, contentTypeDesc));
+    if (ct) {
+      std::string_view ctVw{ct};
+      std::string_view contentTypeDesc =
+          ("application/xml"sv == ctVw || "application/json"sv == ctVw ||
+           ctVw.starts_with("text"))
+              ? std::string_view(buf.data(), buf.size())
+              : ""sv;
+      throw std::runtime_error(
+          std::format("Failed to update entity {} status with code {}: {}",
+                      entityId, code, contentTypeDesc));
+    }
   } break;
   }
 }

@@ -36,6 +36,11 @@ std::string GetErrorMessage(DWORD dwErrorCode) {
     return "Error, unable to receive error message";
   }
 }
+
+void LogLastError() {
+  const auto error = GetLastError();
+  LOGGER->error("Win32 Error ({}): {}", error, GetErrorMessage(error));
+}
 #endif
 
 } // namespace
@@ -45,13 +50,9 @@ namespace callback {
 AsyncFileSave::AsyncFileSave(const std::filesystem::path &dstPath,
                              const boost::url &url, const std::string &user,
                              const std::string &password)
-    : dstPath_{dstPath}, url_{url} {
-  if (!user.empty()) {
-    url_.set_user(user);
-  }
-  if (!password.empty()) {
-    url_.set_password(password);
-  }
+    : dstPath_{dstPath}, url_{url}, user_{user}, password_{password} {
+  spareBuf_.reserve(defaultJpgBufferSize);
+  savedFilePaths_.set_capacity(defaultSavedFilePathsSize);
 }
 
 AsyncFileSave::~AsyncFileSave() noexcept {
@@ -65,6 +66,7 @@ void AsyncFileSave::Register(TaskScheduler *pSched) {
   if (!pSched) {
     throw std::invalid_argument("Usage Environment was null");
   }
+
   pSched_ = pSched;
   wCurlMulti_(curl_multi_setopt, CURLMOPT_SOCKETFUNCTION, SocketCallback);
   wCurlMulti_(curl_multi_setopt, CURLMOPT_SOCKETDATA, this);
@@ -80,29 +82,42 @@ void AsyncFileSave::Register(TaskScheduler *pSched) {
 #endif
 }
 
-void AsyncFileSave::SaveFileAtEndpoint() {
+void AsyncFileSave::SaveFileAtEndpoint(const std::filesystem::path &_dst) {
   // prepare a context
   if (!pSched_) {
     throw std::invalid_argument(
         "Must register first with a Usage Environment Scheduler");
   }
 
-  // format a filename based on the current time, or using a counter
+  if (GetPendingFileOperations() > 10) {
+    return; // drop file write operations over a certain amount until some
+            // process
+  }
 
+  // format a filename based on the current time
   auto dst = dstPath_;
-  if (std::filesystem::is_directory(dst)) {
+  if (std::filesystem::is_directory(dstPath_) && _dst.empty()) {
     const auto now = std::chrono::system_clock::now();
     const auto fileName = std::format("{:%Y-%m-%d_%H-%M-%S}.jpg", now);
     dst /= fileName;
+  } else if (!_dst.has_parent_path()) {
+    // if the path is not absolute, append it to the download directory
+    dst /= _dst;
+  } else {
+    // if the path is absolute, use it as is
+    dst = _dst;
   }
 
-  auto pCtx = easyCtxs_[contextId] = std::make_shared<_CurlEasyContext>();
+  auto pCtx = std::make_shared<_CurlEasyContext>();
 
   try {
 #if _WIN32
     pCtx->writeData.hFile =
         CreateFile(dst.string().c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                    FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
+    ZeroMemory(&pCtx->writeData.overlapped, sizeof(pCtx->writeData.overlapped));
+    pCtx->writeData.overlapped.Offset = 0xFFFFFFFF;
+    pCtx->writeData.overlapped.OffsetHigh = 0xFFFFFFFF;
     pCtx->writeData.overlapped.hEvent = static_cast<HANDLE>(pCtx.get());
 #elif __linux__
     pCtx->writeData._aiocb.aio_fildes = open(
@@ -116,34 +131,35 @@ void AsyncFileSave::SaveFileAtEndpoint() {
     pCtx->writeData._aiocb.aio_sigevent.sigev_signo = IO_SIGNAL;
     pCtx->writeData._aiocb.aio_sigevent.sigev_value.sival_ptr = pCtx.get();
 #endif
-    pCtx->writeData.dstPath = dst;
+    pCtx->writeData.dstPath = std::move(dst);
+    pCtx->writeData.buf = std::move(spareBuf_);
     pCtx->pHandler = this->weak_from_this();
     pCtx->contextId = contextId;
 
     pCtx->wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION,
-                AsyncFileSave::WriteFunction);
+                util::FillBufferCallback);
     pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
 
     pCtx->wCurl(curl_easy_setopt, CURLOPT_URL, url_.c_str());
     pCtx->wCurl(curl_easy_setopt, CURLOPT_HTTPGET, 1L);
-    pCtx->wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &pCtx->writeData);
+    pCtx->wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &pCtx->writeData.buf);
+
+    if (!user_.empty() && !password_.empty()) {
+      pCtx->wCurl(curl_easy_setopt, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST);
+      pCtx->wCurl(curl_easy_setopt, CURLOPT_USERNAME, user_.c_str());
+      pCtx->wCurl(curl_easy_setopt, CURLOPT_PASSWORD, password_.c_str());
+    }
 
     wCurlMulti_(curl_multi_add_handle, pCtx->wCurl.pCurl_);
     pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
 
+    easyCtxs_[contextId] = pCtx;
     ++contextId;
-    return;
   } catch (const std::exception &e) {
     LOGGER->error(e.what());
   } catch (...) {
     LOGGER->error("Unknown error setting up Async File Save");
   }
-#if _WIN32
-  CloseHandle(pCtx->writeData.hFile);
-#elif __linux__
-  close(pCtx->writeData._aiocb.aio_fildes);
-#endif
-  easyCtxs_.erase(contextId);
 }
 
 const boost::circular_buffer<std::filesystem::path> &
@@ -152,8 +168,38 @@ AsyncFileSave::GetSavedFilePaths() const {
 }
 
 void AsyncFileSave::SetLimitSavedFilePaths(size_t limit) {
+  while (savedFilePaths_.size() > limit) {
+    if (!std::filesystem::remove(savedFilePaths_.front())) {
+      LOGGER->warn("Failed to remove file: {}",
+                   savedFilePaths_.front().string());
+    } else {
+      LOGGER->info("Removed file: {}", savedFilePaths_.front().string());
+    }
+    savedFilePaths_.pop_front();
+  }
   savedFilePaths_.set_capacity(limit);
 }
+
+#if _WIN32
+
+AsyncFileSave::Win32Overlapped::~Win32Overlapped() {
+  if (hFile != INVALID_HANDLE_VALUE && !CloseHandle(hFile)) {
+    const auto error = GetLastError();
+    LOGGER->error("Failed to close {} with error ({}): {}", dstPath.string(),
+                  error, GetErrorMessage(error));
+  }
+}
+
+#elif __linux__
+
+AsyncFileSave::LinuxAioFile::~LinuxAioFile() {
+  if (close(writeData._aiocb.aio_fildes) == -1) {
+    LOGGER->error("Failed to close {} with error ({}): {}", dstPath.string(),
+                  errno, strerror(errno));
+  }
+}
+
+#endif
 
 void AsyncFileSave::CheckMultiInfo() {
   CURLMsg *message{nullptr};
@@ -174,13 +220,32 @@ void AsyncFileSave::CheckMultiInfo() {
         try {
           char *effectiveMethod{nullptr};
           curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_METHOD, &effectiveMethod);
-          if (util::NoCaseCmp(effectiveMethod, "GET")) {
+          int responseCode{0};
+          curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &responseCode);
+
+          switch (responseCode) {
+          case 200:
+          case 201:
+            if (util::NoCaseCmp(effectiveMethod, "GET")) {
 #if _WIN32
-            DWORD bytesTransferred{0};
-            GetOverlappedResult(pCtx->writeData.hFile,
-                                &pCtx->writeData.overlapped, &bytesTransferred,
-                                TRUE);
+              const auto res = WriteFileEx(
+                  pCtx->writeData.hFile, pCtx->writeData.buf.data(),
+                  pCtx->writeData.buf.size(), &pCtx->writeData.overlapped,
+                  AsyncFileSave::FileIOCompletionRoutine);
+              if (res == ERROR) {
+                LogLastError();
+                std::filesystem::remove(pCtx->writeData.dstPath);
+                RemoveContext(pCtx.get());
+              }
 #endif
+            }
+            break;
+          default:
+            LOGGER->info("CURL Request failed with response code {}",
+                         responseCode);
+            std::filesystem::remove(pCtx->writeData.dstPath);
+            RemoveContext(pCtx.get());
+            break;
           }
         } catch (const std::exception &e) {
           LOGGER->error(e.what());
@@ -283,47 +348,22 @@ void AsyncFileSave::TimeoutHandlerProc(void *asyncFileSave_clientData) {
   }
 }
 
-size_t AsyncFileSave::WriteFunction(char *contents, size_t sz, size_t nmemb,
-                                    void *pUserData) {
-  if (pUserData) {
-    size_t realsize = sz * nmemb;
-#if _WIN32
-    auto *pWin32Overlapped = std::bit_cast<Win32Overlapped *>(pUserData);
-    if (!WriteFileEx(pWin32Overlapped->hFile, contents, realsize,
-                     &pWin32Overlapped->overlapped, FileIOCompletionRoutine)) {
-      LOGGER->error(GetErrorMessage(GetLastError()));
-    }
-#elif __linux__
-    auto *pLinuxAioFile = static_cast<LinuxAioFile *>(pUserData);
-
-    pLinuxAioFile->buf.resize(realsize, '\0');
-    memcpy(pLinuxAioFile->buf.data(), contents, realsize);
-    pLinuxAioFile->_aiocb.aio_buf = pLinuxAioFile->buf.data();
-    pLinuxAioFile->_aiocb.aio_nbytes = pLinuxAioFile->buf.size();
-
-    if (aio_write(&pLinuxAioFile->_aiocb) == -1) {
-      LOGGER->error(strerror(errno));
-    }
-#endif
-    return realsize;
-  }
-  return 0;
-}
-
 #if _WIN32
 
 VOID CALLBACK AsyncFileSave::FileIOCompletionRoutine(
     __in DWORD dwErrorCode, __in DWORD dwNumberOfBytesTransferred,
     __in LPOVERLAPPED lpOverlapped) {
-  auto pCtx = static_cast<_CurlEasyContext *>(lpOverlapped->hEvent);
-  if (!CloseHandle(pCtx->writeData.hFile)) {
-    LOGGER->warn("Failed to close file");
-  } else {
-    LOGGER->info("Closed handle to {}", pCtx->writeData.hFile);
+  if (dwErrorCode != NOERROR) {
+    LOGGER->error(GetErrorMessage(dwErrorCode));
   }
-  if (auto pHandler = pCtx->pHandler.lock()) {
-    pHandler->savedFilePaths_.push_back(std::move(pCtx->writeData.dstPath));
-    pHandler->easyCtxs_.erase(pCtx->contextId);
+  if (lpOverlapped->hEvent) {
+    auto pCtx = static_cast<_CurlEasyContext *>(lpOverlapped->hEvent);
+    if (dwNumberOfBytesTransferred != pCtx->writeData.buf.size()) {
+      LOGGER->error("File IO incomplete for {}, {} bytes written of {}",
+                    pCtx->writeData.dstPath.string(),
+                    dwNumberOfBytesTransferred, pCtx->writeData.buf.size());
+    }
+    RemoveContext(pCtx);
   }
 }
 
@@ -335,30 +375,23 @@ void AsyncFileSave::AioSigHandler(int sig, siginfo_t *si, void *) {
     const ssize_t bytesWritten = aio_return(&pCtx->writeData._aiocb);
     if (bytesWritten == -1) {
       LOGGER->error(strerror(errno));
-      close(pCtx->writeData._aiocb.aio_fildes);
     } else if (bytesWritten == pCtx->writeData.buf.size()) {
       LOGGER->info("File IO complete {}", pCtx->writeData.dstPath.string());
-      close(pCtx->writeData._aiocb.aio_fildes);
-
-      if (auto pHandler = pCtx->pHandler.lock()) {
-        pHandler->pSched_->scheduleDelayedTask(
-            0,
-            [](void *clientData) {
-              if (!clientData) {
-                return;
-              }
-              auto *pCtx = static_cast<_CurlEasyContext *>(clientData);
-              if (auto pHandler = pCtx->pHandler.lock()) {
-                pHandler->savedFilePaths_.push_back(
-                    std::move(pCtx->writeData.dstPath));
-                pHandler->easyCtxs_.erase(pCtx->contextId);
-              }
-            },
-            pCtx);
-      }
     } else {
       LOGGER->info("Filo IO incomplete {}, {} bytes written",
                    pCtx->writeData.dstPath.string(), bytesWritten);
+      return; // do not remove context yet
+    }
+    if (auto pHandler = pCtx->pHandler.lock()) {
+      pHandler->pSched_->scheduleDelayedTask(
+          0,
+          [](void *clientData) {
+            if (!clientData) {
+              return;
+            }
+            RemoveContext(static_cast<_CurlEasyContext *>(clientData));
+          },
+          pCtx);
     }
   }
 }
@@ -378,5 +411,33 @@ void AsyncFileSave::InstallHandlers() {
 }
 
 #endif
+
+void AsyncFileSave::RemoveContext(_CurlEasyContext *pCtx) {
+  if (!pCtx) {
+    return; // no-op
+  }
+  if (auto pHandler = pCtx->pHandler.lock()) {
+    LOGGER->info("Existing Images {}, capacity {}",
+                 pHandler->savedFilePaths_.size(),
+                 pHandler->savedFilePaths_.capacity());
+    if (pHandler->savedFilePaths_.full()) {
+      const auto &oldFile = pHandler->savedFilePaths_.front();
+      if (std::filesystem::remove(oldFile)) {
+        LOGGER->info("Removed {}, maximum file buffer size reached ({})",
+                     oldFile, pHandler->savedFilePaths_.capacity());
+      } else {
+        LOGGER->warn(
+            "Failed to remove {}, maximum saved images reached ({}), but "
+            "old data has not been deleted, the disk may begin to fill",
+            oldFile, pHandler->savedFilePaths_.capacity());
+      }
+    }
+    pHandler->savedFilePaths_.push_back(pCtx->writeData.dstPath);
+
+    // Avoid reallocating a buffer, stash it in a node with a max key
+    pHandler->spareBuf_.swap(pCtx->writeData.buf);
+    pHandler->easyCtxs_.erase(pCtx->contextId);
+  }
+}
 
 } // namespace callback

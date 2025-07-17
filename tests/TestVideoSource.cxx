@@ -32,6 +32,53 @@ TEST(HttpVideoSourceTests, TestReceiveFrame) {
   }
 }
 
+TEST(HttpVideoSourceTests, TestReceiveLargeFrame) {
+  try {
+    static constexpr int width{3840};
+    static constexpr int height{2160};
+    static constexpr int shapes{6000};
+
+    auto url = SimServer::GetBaseUrl();
+    url.set_path("/api/getimage");
+    url.set_params({{"width", std::to_string(width)},
+                    {"height", std::to_string(height)},
+                    {"shapes", std::to_string(shapes)}});
+
+    video_source::HttpVideoSource http(url);
+    http.delayBetweenFrames = 10s;
+
+    std::mutex mtx;
+    std::condition_variable cv;
+
+    auto handler = [&](const video_source::Frame &frame) {
+      {
+        std::unique_lock lk(mtx);
+        cv.notify_all();
+      }
+      EXPECT_FALSE(frame.img.empty());
+      EXPECT_EQ(width, frame.img.cols);
+      EXPECT_EQ(height, frame.img.rows);
+      EXPECT_EQ(3, frame.img.channels());
+      EXPECT_NO_THROW(http.StopStream());
+    };
+
+    std::jthread timeout([&] { // timeout for the test
+      std::unique_lock lk(mtx);
+      if (cv.wait_for(lk, 10s) == std::cv_status::timeout) {
+        http.StopStream();
+        FAIL() << "Timeout waiting for frame";
+      }
+    });
+
+    http.Subscribe(handler);
+    http.timeout = 10s; // timeout for the request
+
+    EXPECT_NO_THROW(http.StartStream(1));
+  } catch (const std::exception &e) {
+    FAIL() << "Exception thrown: " << e.what();
+  }
+}
+
 TEST(Live555VideoSourceTests, Smoke) {
   video_source::Live555VideoSource live555(boost::url(""));
   EXPECT_THROW(live555.StartStream(0), std::runtime_error);

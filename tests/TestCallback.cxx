@@ -144,7 +144,7 @@ protected:
     std::mt19937 engine(rd());
     std::uniform_int_distribution<unsigned int> dist(0x0000'0000, 0xFFFF'FFFF);
     downloadDir_ = std::filesystem::temp_directory_path() /
-                   std::format("TestAsyncFileSave-{:08x}", dist(engine));
+                   std::format("TestAsyncFileSave/{:08x}", dist(engine));
     std::filesystem::create_directories(downloadDir_);
   }
   void TearDown() override {
@@ -154,42 +154,129 @@ protected:
 
   TaskScheduler *pSched_{nullptr};
   std::filesystem::path downloadDir_;
+  EventLoopWatchVariable wv_{0};
 
   static void DownloadFile(void *clientData) {
+    static int counter{1};
     auto *pAsyncFileSave = static_cast<callback::AsyncFileSave *>(clientData);
-    pAsyncFileSave->SaveFileAtEndpoint();
+    pAsyncFileSave->SaveFileAtEndpoint(std::to_string(counter++) + ".jpg");
+  }
+
+  struct TryEndLoopData {
+    callback::AsyncFileSave *pAsyncFileSave{nullptr};
+    EventLoopWatchVariable *pWatchVariable{nullptr};
+    TaskScheduler *pSched{nullptr};
+    size_t target{0};
+  };
+
+  static void TryEndLoop(void *clientData) {
+    auto [pAsyncFileSave, pWv, pSched, target] =
+        *static_cast<TryEndLoopData *>(clientData);
+    if (pAsyncFileSave->GetPendingRequestOperations() == 0 &&
+        pAsyncFileSave->GetPendingFileOperations() == 0) {
+      pSched->scheduleDelayedTask(0, EndLoop, pWv);
+    } else {
+      pSched->scheduleDelayedTask(1000, TryEndLoop, clientData);
+    }
   }
 };
 
-TEST_F(TestAsyncFileSave, CanSaveAnImage) {
+TEST_F(TestAsyncFileSave, CanSaveSimultaneousImages) {
+
+  static constexpr int width{680};
+  static constexpr int height{480};
+
   std::barrier sync(2);
+
   auto url = SimServer::GetBaseUrl();
   url.set_path("/api/getimage");
-  url.set_params({{"width", "640"}, {"height", "480"}});
+  url.set_params(
+      {{"width", std::to_string(width)}, {"height", std::to_string(height)}});
 
   auto asyncFileSave =
       std::make_shared<callback::AsyncFileSave>(downloadDir_, url);
+
+  static constexpr int imgLimit{20};
+  asyncFileSave->SetLimitSavedFilePaths(imgLimit);
+
   asyncFileSave->Register(pSched_);
 
-  const auto trigger = pSched_->createEventTrigger(EndLoop);
-
   static constexpr int imgCount{25};
+  static constexpr int interval{200'000};
 
   for (int i{0}; i < imgCount; ++i) {
-    pSched_->scheduleDelayedTask(0, TestAsyncFileSave::DownloadFile,
+    pSched_->scheduleDelayedTask(i * interval, TestAsyncFileSave::DownloadFile,
                                  asyncFileSave.get());
   }
 
-  EventLoopWatchVariable wv{0};
-  pSched_->scheduleDelayedTask((5'000'000us).count(), EndLoop, &wv);
+  TryEndLoopData tryEndLoopData{asyncFileSave.get(), &wv_, pSched_};
 
-  pSched_->doEventLoop(&wv);
+  static constexpr auto timeout = 10'000'000us; // 10 seconds
 
+  pSched_->scheduleDelayedTask(imgCount * interval, TryEndLoop,
+                               &tryEndLoopData);
+  pSched_->scheduleDelayedTask(timeout.count(), EndLoop, &wv_);
+
+  pSched_->doEventLoop(&wv_);
+
+  cv::Mat readImg;
   for (const auto &fs : asyncFileSave->GetSavedFilePaths()) {
-    EXPECT_FALSE(cv::imread(fs.string(), cv::IMREAD_UNCHANGED).empty())
+    cv::imread(fs.string(), readImg, cv::IMREAD_UNCHANGED);
+    EXPECT_FALSE(readImg.empty())
         << "Could not read downloaded image back at " << fs.string();
+    EXPECT_EQ(readImg.cols, width);
+    EXPECT_EQ(readImg.rows, height);
+    EXPECT_EQ(readImg.channels(), 3);
   }
 
   EXPECT_EQ(asyncFileSave->GetPendingRequestOperations(), 0);
   EXPECT_EQ(asyncFileSave->GetPendingFileOperations(), 0);
+  EXPECT_EQ(asyncFileSave->GetSavedFilePaths().size(), imgLimit);
+}
+
+TEST_F(TestAsyncFileSave, CanSaveALargeImage) {
+  static constexpr int width{3840};
+  static constexpr int height{2160};
+  static constexpr int shapes{1200};
+
+  std::barrier sync(2);
+
+  auto url = SimServer::GetBaseUrl();
+  url.set_path("/api/getimage");
+  url.set_params({{"width", std::to_string(width)},
+                  {"height", std::to_string(height)},
+                  {"shapes", std::to_string(shapes)}});
+
+  auto asyncFileSave =
+      std::make_shared<callback::AsyncFileSave>(downloadDir_, url);
+
+  static constexpr int imgLimit{20};
+  asyncFileSave->SetLimitSavedFilePaths(imgLimit);
+
+  asyncFileSave->Register(pSched_);
+
+  pSched_->scheduleDelayedTask(1000, TestAsyncFileSave::DownloadFile,
+                               asyncFileSave.get());
+
+  TryEndLoopData tryEndLoopData{asyncFileSave.get(), &wv_, pSched_};
+  pSched_->scheduleDelayedTask(1000, TryEndLoop, &tryEndLoopData);
+
+  pSched_->scheduleDelayedTask((20'000'000us).count(), EndLoop,
+                               &wv_); // timeout 10s
+
+  pSched_->doEventLoop(&wv_);
+
+  cv::Mat readImg;
+  for (const auto &fs : asyncFileSave->GetSavedFilePaths()) {
+    cv::imread(fs.string(), readImg, cv::IMREAD_UNCHANGED);
+    EXPECT_FALSE(readImg.empty())
+        << "Could not read downloaded image back at " << fs.string();
+    EXPECT_EQ(readImg.cols, width);
+    EXPECT_EQ(readImg.rows, height);
+    EXPECT_EQ(readImg.channels(), 3);
+  }
+
+  EXPECT_EQ(asyncFileSave->GetPendingRequestOperations(), 0);
+  EXPECT_EQ(asyncFileSave->GetPendingFileOperations(), 0);
+  EXPECT_LT(asyncFileSave->GetSavedFilePaths().size(), imgLimit);
 }

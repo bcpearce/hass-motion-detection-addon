@@ -15,9 +15,7 @@ size_t FillBufferCallback(char *contents, size_t sz, size_t nmemb,
   if (pUserData) {
     std::vector<char> &buf = *static_cast<std::vector<char> *>(pUserData);
     size_t realsize = sz * nmemb;
-    buf.reserve(buf.size() + realsize);
-    std::ranges::copy(std::span<char>(contents, realsize),
-                      std::back_inserter(buf));
+    buf.insert_range(buf.end(), std::span<char>(contents, realsize));
     return realsize;
   }
   return 0;

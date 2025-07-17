@@ -38,7 +38,7 @@ public:
   virtual ~AsyncFileSave() noexcept;
 
   void Register(TaskScheduler *pSched);
-  void SaveFileAtEndpoint();
+  void SaveFileAtEndpoint(const std::filesystem::path &dst = {});
 
   size_t GetPendingRequestOperations() const { return socketCtxs_.size(); }
   size_t GetPendingFileOperations() const { return easyCtxs_.size(); }
@@ -48,11 +48,16 @@ public:
 
   void SetLimitSavedFilePaths(size_t limit);
 
+  size_t defaultJpgBufferSize{2 * 1024 * 1024}; // default to 2Mb
+  size_t defaultSavedFilePathsSize{200};
+
 private:
   boost::url url_;
+  std::string user_;
+  std::string password_;
   std::filesystem::path dstPath_;
 
-  boost::circular_buffer<std::filesystem::path> savedFilePaths_{200};
+  boost::circular_buffer<std::filesystem::path> savedFilePaths_;
 
   TaskScheduler *pSched_{nullptr};
   util::CurlMultiWrapper wCurlMulti_;
@@ -60,10 +65,13 @@ private:
 
 #if _WIN32
   struct Win32Overlapped {
-    HANDLE hFile{nullptr};
-    OVERLAPPED overlapped{};
+    HANDLE hFile{INVALID_HANDLE_VALUE};
+    OVERLAPPED overlapped{.hEvent{0}};
     LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine{nullptr};
+    std::vector<char> buf;
     std::filesystem::path dstPath;
+
+    ~Win32Overlapped() noexcept;
   };
   using _CurlEasyContext =
       CurlEasyContext<Win32Overlapped, void *, AsyncFileSave>;
@@ -72,12 +80,15 @@ private:
     aiocb _aiocb{};
     std::vector<char> buf;
     std::filesystem::path dstPath;
+
+    ~LinuxAioFile() noexcept;
   };
   using _CurlEasyContext = CurlEasyContext<LinuxAioFile, void *, AsyncFileSave>;
 #endif
   using _CurlSocketContext = CurlSocketContext<AsyncFileSave>;
 
   std::unordered_map<size_t, std::shared_ptr<_CurlEasyContext>> easyCtxs_;
+  std::vector<char> spareBuf_;
   std::unordered_map<curl_socket_t, std::shared_ptr<_CurlSocketContext>>
       socketCtxs_;
 
@@ -96,9 +107,6 @@ private:
   static void TimeoutHandlerProc(void *asyncFileSave_clientData);
   static void DebounceUpdateProc(void *asyncFileSave_clientData);
 
-  static size_t WriteFunction(char *contents, size_t sz, size_t nmemb,
-                              void *pUserData);
-
 #ifdef __linux__
   static void AioSigHandler(int sig, siginfo_t *si, void *ucontext);
   static void InstallHandlers();
@@ -109,6 +117,8 @@ private:
       __in DWORD dwErrorCode, __in DWORD dwNumberOfBytesTransferred,
       __in LPOVERLAPPED lpOverlapped);
 #endif
+
+  static void RemoveContext(_CurlEasyContext *pCtx);
 };
 
 } // namespace callback

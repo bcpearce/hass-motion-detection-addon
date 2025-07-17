@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string_view>
 
 #include <boost/url.hpp>
@@ -48,5 +49,14 @@ struct fmt::formatter<boost::url> : fmt::formatter<std::string_view> {
     }
     return fmt::format_to(ctx.out(), "{}",
                           std::string_view(url.data(), url.size()));
+  }
+};
+
+template <>
+struct fmt::formatter<std::filesystem::path>
+    : fmt::formatter<std::string_view> {
+  auto format(const std::filesystem::path &path, format_context &ctx) const
+      -> decltype(ctx.out()) {
+    return fmt::format_to(ctx.out(), "{}", path.string());
   }
 };
