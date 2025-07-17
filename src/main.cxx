@@ -145,6 +145,8 @@ void App(const util::ProgramOptions &opts) {
 
       pFileSaveHandler->Register(pLive555Source->GetTaskSchedulerPtr());
       pDetector->Subscribe(onMotionDetectionCallbackSave);
+      LOGGER->info("Saving motion detection images to {}",
+                   opts.saveDestination);
     }
   }
 

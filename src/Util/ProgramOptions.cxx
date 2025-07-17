@@ -110,7 +110,7 @@ ProgramOptions::ParseOptions(int argc, const char **argv) {
        "higher fidelity images. This will use the same authentication scheme "
        "as the source URL and should have the same host.")
       /**/
-      ("save-image-limit", po::value<int>()->default_value(200),
+      ("save-image-limit", po::value<size_t>()->default_value(200),
        "maximum number of images to save per motion detection event, default "
        "is 200");
   allOptions.add(detectionOptions);

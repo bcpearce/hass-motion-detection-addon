@@ -178,10 +178,9 @@ AsyncFileSave::GetSavedFilePaths() const {
 void AsyncFileSave::SetLimitSavedFilePaths(size_t limit) {
   while (savedFilePaths_.size() > limit) {
     if (!std::filesystem::remove(savedFilePaths_.front())) {
-      LOGGER->warn("Failed to remove file: {}",
-                   savedFilePaths_.front().string());
+      LOGGER->warn("Failed to remove file: {}", savedFilePaths_.front());
     } else {
-      LOGGER->info("Removed file: {}", savedFilePaths_.front().string());
+      LOGGER->info("Removed file: {}", savedFilePaths_.front());
     }
     savedFilePaths_.pop_front();
   }
@@ -193,8 +192,8 @@ void AsyncFileSave::SetLimitSavedFilePaths(size_t limit) {
 AsyncFileSave::Win32Overlapped::~Win32Overlapped() {
   if (hFile != INVALID_HANDLE_VALUE && !CloseHandle(hFile)) {
     const auto error = GetLastError();
-    LOGGER->error("Failed to close {} with error ({}): {}", dstPath.string(),
-                  error, GetErrorMessage(error));
+    LOGGER->error("Failed to close {} with error ({}): {}", dstPath, error,
+                  GetErrorMessage(error));
   }
 }
 
@@ -202,8 +201,8 @@ AsyncFileSave::Win32Overlapped::~Win32Overlapped() {
 
 AsyncFileSave::LinuxAioFile::~LinuxAioFile() {
   if (close(_aiocb.aio_fildes) == -1) {
-    LOGGER->error("Failed to close {} with error ({}): {}", dstPath.string(),
-                  errno, strerror(errno));
+    LOGGER->error("Failed to close {} with error ({}): {}", dstPath, errno,
+                  strerror(errno));
   }
 }
 
@@ -391,10 +390,10 @@ void AsyncFileSave::AioSigHandler(int sig, siginfo_t *si, void *) {
     if (bytesWritten == -1) {
       LOGGER->error(strerror(errno));
     } else if (bytesWritten == pCtx->writeData.buf.size()) {
-      LOGGER->info("File IO complete {}", pCtx->writeData.dstPath.string());
+      LOGGER->info("File IO complete {}", pCtx->writeData.dstPath);
     } else {
       LOGGER->info("Filo IO incomplete {}, {} bytes written",
-                   pCtx->writeData.dstPath.string(), bytesWritten);
+                   pCtx->writeData.dstPath, bytesWritten);
       return; // do not remove context yet
     }
     if (auto pHandler = pCtx->pHandler.lock()) {
