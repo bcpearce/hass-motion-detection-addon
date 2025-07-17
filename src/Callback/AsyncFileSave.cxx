@@ -431,9 +431,6 @@ void AsyncFileSave::RemoveContext(_CurlEasyContext *pCtx) {
     return; // no-op
   }
   if (auto pHandler = pCtx->pHandler.lock()) {
-    LOGGER->info("Existing Images {}, capacity {}",
-                 pHandler->savedFilePaths_.size(),
-                 pHandler->savedFilePaths_.capacity());
     if (pHandler->savedFilePaths_.full()) {
       const auto &oldFile = pHandler->savedFilePaths_.front();
       if (std::filesystem::remove(oldFile)) {
