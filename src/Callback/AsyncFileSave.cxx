@@ -41,6 +41,14 @@ void LogLastError() {
   const auto error = GetLastError();
   LOGGER->error("Win32 Error ({}): {}", error, GetErrorMessage(error));
 }
+
+#elif __linux__
+
+void LogLastError() {
+  const auto error = errno;
+  LOGGER->error("Linux Error ({}): {}", error, strerror(error));
+}
+
 #endif
 
 } // namespace
@@ -193,7 +201,7 @@ AsyncFileSave::Win32Overlapped::~Win32Overlapped() {
 #elif __linux__
 
 AsyncFileSave::LinuxAioFile::~LinuxAioFile() {
-  if (close(writeData._aiocb.aio_fildes) == -1) {
+  if (close(_aiocb.aio_fildes) == -1) {
     LOGGER->error("Failed to close {} with error ({}): {}", dstPath.string(),
                   errno, strerror(errno));
   }
@@ -235,7 +243,14 @@ void AsyncFileSave::CheckMultiInfo() {
               if (res == ERROR) {
                 LogLastError();
                 std::filesystem::remove(pCtx->writeData.dstPath);
-                RemoveContext(pCtx.get());
+              }
+#elif __linux__
+              pCtx->writeData._aiocb.aio_buf = pCtx->writeData.buf.data();
+              pCtx->writeData._aiocb.aio_nbytes = pCtx->writeData.buf.size();
+              const auto res = aio_write(&pCtx->writeData._aiocb);
+              if (res == -1) {
+                LogLastError();
+                std::filesystem::remove(pCtx->writeData.dstPath);
               }
 #endif
             }

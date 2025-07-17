@@ -133,10 +133,14 @@ void App(const util::ProgramOptions &opts) {
           opts.sourcePassword);
       pFileSaveHandler->SetLimitSavedFilePaths(10);
       auto onMotionDetectionCallbackSave =
-          [pFileSaveHandler](detector::Payload data) {
-            if (data.rois.size() > 0) {
+          [pFileSaveHandler,
+           previousRoiCount = 0](detector::Payload data) mutable {
+            // save on the rising edge of motion detection, rois goes from 0 to
+            // non-zero
+            if (previousRoiCount == 0 && data.rois.size() > 0) {
               pFileSaveHandler->SaveFileAtEndpoint();
             }
+            previousRoiCount = data.rois.size();
           };
 
       pFileSaveHandler->Register(pLive555Source->GetTaskSchedulerPtr());
