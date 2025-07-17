@@ -195,6 +195,7 @@ ProgramOptions::ParseOptions(int argc, const char **argv) {
 
     options.saveDestination = vm["save-destination"].as<std::string>();
     options.saveSourceUrl = boost::url(vm["save-source-url"].as<std::string>());
+    options.saveImageLimit = vm["save-image-limit"].as<size_t>();
 
   } catch (const std::exception &e) {
     std::ostringstream oss;

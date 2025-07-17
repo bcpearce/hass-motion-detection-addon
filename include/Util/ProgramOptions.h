@@ -31,6 +31,7 @@ struct ProgramOptions {
   std::chrono::seconds detectionDebounce{30};
   std::filesystem::path saveDestination;
   boost::url saveSourceUrl{""};
+  size_t saveImageLimit{200};
 
   [[nodiscard]] bool CanSetupHass() const;
 };

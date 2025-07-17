@@ -131,7 +131,7 @@ void App(const util::ProgramOptions &opts) {
       pFileSaveHandler = std::make_shared<callback::AsyncFileSave>(
           opts.saveDestination, opts.saveSourceUrl, opts.sourceUsername,
           opts.sourcePassword);
-      pFileSaveHandler->SetLimitSavedFilePaths(10);
+      pFileSaveHandler->SetLimitSavedFilePaths(opts.saveImageLimit);
       auto onMotionDetectionCallbackSave =
           [pFileSaveHandler,
            previousRoiCount = 0](detector::Payload data) mutable {
