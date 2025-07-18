@@ -6,7 +6,6 @@
 #include "Util/BufferOperations.h"
 #include "Util/Tools.h"
 
-#include <bit>
 #include <ranges>
 
 #if __linux__
@@ -30,7 +29,8 @@ std::string GetErrorMessage(DWORD dwErrorCode) {
                 (LPTSTR)&lpMsgBuf, 0, NULL);
 
   if (lpMsgBuf) {
-    return std::format(TEXT("Error ({}): {}"), dwErrorCode, (LPTSTR)lpMsgBuf);
+    return std::format(TEXT("Error ({}): {}"), dwErrorCode,
+                       static_cast<LPTSTR>(lpMsgBuf));
     LocalFree(lpMsgBuf);
   } else {
     return "Error, unable to receive error message";
@@ -55,10 +55,12 @@ void LogLastError() {
 
 namespace callback {
 
-AsyncFileSave::AsyncFileSave(const std::filesystem::path &dstPath,
+AsyncFileSave::AsyncFileSave(TaskScheduler *pSched,
+                             const std::filesystem::path &dstPath,
                              const boost::url &url, const std::string &user,
                              const std::string &password)
-    : dstPath_{dstPath}, url_{url}, user_{user}, password_{password} {
+    : AsyncDebouncer(pSched), pSched_{pSched}, dstPath_{dstPath}, url_{url},
+      user_{user}, password_{password} {
   spareBuf_.reserve(defaultJpgBufferSize);
   savedFilePaths_.set_capacity(defaultSavedFilePathsSize);
 }
@@ -70,12 +72,7 @@ AsyncFileSave::~AsyncFileSave() noexcept {
   }
 }
 
-void AsyncFileSave::Register(TaskScheduler *pSched) {
-  if (!pSched) {
-    throw std::invalid_argument("Usage Environment was null");
-  }
-
-  pSched_ = pSched;
+void AsyncFileSave::Register() {
   wCurlMulti_(curl_multi_setopt, CURLMOPT_SOCKETFUNCTION, SocketCallback);
   wCurlMulti_(curl_multi_setopt, CURLMOPT_SOCKETDATA, this);
   wCurlMulti_(curl_multi_setopt, CURLMOPT_TIMERFUNCTION, TimeoutCallback);
@@ -91,16 +88,6 @@ void AsyncFileSave::Register(TaskScheduler *pSched) {
 }
 
 void AsyncFileSave::SaveFileAtEndpoint(const std::filesystem::path &_dst) {
-  // prepare a context
-  if (!pSched_) {
-    throw std::invalid_argument(
-        "Must register first with a Usage Environment Scheduler");
-  }
-
-  if (GetPendingFileOperations() > 10) {
-    return; // drop file write operations over a certain amount until some
-            // process
-  }
 
   // format a filename based on the current time
   auto dst = dstPath_;
@@ -167,6 +154,23 @@ void AsyncFileSave::SaveFileAtEndpoint(const std::filesystem::path &_dst) {
     LOGGER->error(e.what());
   } catch (...) {
     LOGGER->error("Unknown error setting up Async File Save");
+  }
+}
+
+void AsyncFileSave::operator()(detector::Payload data) {
+
+  static decltype(data.rois) lastRois = {};
+
+  const bool risingEdge = lastRois.empty() && !data.rois.empty();
+
+  if (UpdateAllowed() && risingEdge) {
+    SaveFileAtEndpoint();
+    Debounce(debounceTime);
+  }
+
+  const bool reschedule = !UpdateAllowed() && !data.rois.empty();
+  if (reschedule) {
+    Debounce(debounceTime);
   }
 }
 

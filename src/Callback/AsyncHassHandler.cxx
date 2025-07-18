@@ -21,10 +21,11 @@ static size_t contextId{1};
 
 namespace callback {
 
-AsyncHassHandler::AsyncHassHandler(const boost::url &url,
+AsyncHassHandler::AsyncHassHandler(TaskScheduler *pSched, const boost::url &url,
                                    const std::string &token,
                                    const std::string &entityId)
-    : BaseHassHandler(url, token, entityId) {}
+    : BaseHassHandler(url, token, entityId), AsyncDebouncer(pSched),
+      pSched_{pSched} {}
 
 AsyncHassHandler::~AsyncHassHandler() noexcept {
   for (const auto &socketCtx : socketCtxs_ | std::views::values) {
@@ -33,12 +34,8 @@ AsyncHassHandler::~AsyncHassHandler() noexcept {
   }
 }
 
-void AsyncHassHandler::Register(TaskScheduler *pSched) {
-  if (!pSched) {
-    throw std::invalid_argument("Usage Environment was null");
-  }
-
-  pSched_ = pSched;
+void AsyncHassHandler::Register() {
+  // startup CURL and get the initial state
   wCurlMulti_(curl_multi_setopt, CURLMOPT_SOCKETFUNCTION, SocketCallback);
   wCurlMulti_(curl_multi_setopt, CURLMOPT_SOCKETDATA, this);
   wCurlMulti_(curl_multi_setopt, CURLMOPT_TIMERFUNCTION, TimeoutCallback);
@@ -56,7 +53,7 @@ void AsyncHassHandler::UpdateState_Impl(std::string_view state,
   UpdateStateInternal(state, attributes);
 
   const bool stateChanging = IsStateChanging();
-  if (allowUpdate_ && stateChanging) {
+  if (UpdateAllowed() && stateChanging) {
     // insert and  get a reference to this
     // not thread safe
     auto pCtx = easyCtxs_[contextId++] = std::make_shared<_CurlEasyContext>();
@@ -67,11 +64,7 @@ void AsyncHassHandler::UpdateState_Impl(std::string_view state,
     pCtx->wCurl(curl_easy_setopt, CURLOPT_PRIVATE, contextId);
 
     // debounce
-    allowUpdate_ = false;
-    debounceTaskToken_ = pSched_->scheduleDelayedTask(
-        std::chrono::duration_cast<std::chrono::microseconds>(debounceTime)
-            .count(),
-        DebounceUpdateProc, this);
+    Debounce(debounceTime);
   }
 }
 
@@ -210,15 +203,6 @@ void AsyncHassHandler::TimeoutHandlerProc(void *asyncHassHandler_clientData) {
     pAhh->wCurlMulti_(curl_multi_socket_action, CURL_SOCKET_TIMEOUT, 0,
                       &runningHandles);
     pAhh->CheckMultiInfo();
-  }
-}
-
-void AsyncHassHandler::DebounceUpdateProc(void *asyncHassHandler_clientData) {
-  if (asyncHassHandler_clientData) {
-    AsyncHassHandler *ahh =
-        static_cast<AsyncHassHandler *>(asyncHassHandler_clientData);
-    LOGGER->debug("Restoring update ability to {}", ahh->entityId);
-    ahh->allowUpdate_ = true;
   }
 }
 

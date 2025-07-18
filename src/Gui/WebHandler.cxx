@@ -5,7 +5,6 @@
 #include "Gui/WebHandler.h"
 
 #include <barrier>
-#include <filesystem>
 #include <iostream>
 
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
@@ -21,6 +20,8 @@ namespace {
 static std::atomic_bool broadcastLogs{false};
 static struct mg_mgr *pMgr{nullptr};
 static unsigned long parentConnId{0};
+
+static std::filesystem::path savedFilesPath;
 
 static constexpr const char *mjpegHeaders =
     "HTTP/1.0 200 OK\r\n"
@@ -54,9 +55,12 @@ static void BroadcastImage_TimerCallback(void *arg) {
         static_cast<gui::WebHandler::BroadcastImageData *>(arg));
   }
 }
+} // namespace
+
+namespace gui {
 
 // HTTP server event handler function
-void EventHandler(mg_connection *c, int ev, void *ev_data) {
+void WebHandler::EventHandler(mg_connection *c, int ev, void *ev_data) {
   switch (ev) {
   case MG_EV_OPEN:
     if (c->is_listening) {
@@ -66,7 +70,7 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
     }
     break;
   case MG_EV_HTTP_MSG: {
-    mg_http_message *hm = (mg_http_message *)ev_data;
+    struct mg_http_message *hm = static_cast<mg_http_message *>(ev_data);
     if (mg_match(hm->uri, mg_str("/media/live"), nullptr)) {
       c->data[0] = 'L';
       mg_printf(c, "%s", mjpegHeaders);
@@ -76,14 +80,33 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
     } else if (mg_match(hm->uri, mg_str("/websocket"), nullptr)) {
       mg_ws_upgrade(c, hm, nullptr);
       c->data[0] = 'W';
+    } else if (struct mg_str *cap{nullptr};
+               mg_match(hm->uri, mg_str("/media/saved/*"), cap)) {
+      struct mg_http_serve_opts opts;
+      memset(&opts, 0, sizeof(opts));
+      thread_local std::string pathStr;
+      if (!cap || cap->len == 0) {
+        pathStr = std::format(".,/media/saved={}", savedFilesPath.string());
+        opts.root_dir = pathStr.c_str();
+        mg_http_serve_dir(c, hm, &opts);
+      } else {
+        pathStr = (savedFilesPath / std::string(cap->buf, cap->len)).string();
+        opts.mime_types = "jpg=image/jpg";
+        mg_http_serve_file(c, hm, pathStr.c_str(), &opts);
+      }
     } else {
+      struct mg_http_serve_opts opts;
+      memset(&opts, 0, sizeof(opts));
 #ifdef SERVE_UNPACKED
       // Use for testing, enables "hot reload" for resources in public folder
-      const auto rootDir =
+      static const auto rootDir =
           std::filesystem::path(__FILE__).parent_path() / "public";
-      mg_http_serve_opts opts = {.root_dir = rootDir.string().c_str()};
+      thread_local std::string pathStr;
+      pathStr = rootDir.string();
+      opts.root_dir = pathStr.c_str();
 #else
-      mg_http_serve_opts opts = {.root_dir = "/public", .fs = &mg_fs_packed};
+      opts.root_dir = "/public";
+      opts.fs = &mg_fs_packed;
 #endif
       mg_http_serve_dir(c, hm, &opts);
     }
@@ -98,9 +121,11 @@ void EventHandler(mg_connection *c, int ev, void *ev_data) {
   } break;
   }
 }
-} // namespace
 
-namespace gui {
+void WebHandler::SetSavedFilesServePath(
+    const std::filesystem::path &_savedFilesPath) {
+  savedFilesPath = _savedFilesPath;
+}
 
 WebHandler::WebHandler(int port, std::string_view host) {
   url_.set_scheme("http");

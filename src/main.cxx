@@ -56,14 +56,18 @@ void EventLoopSignalHandler(int signal) {}
 
 void App(const util::ProgramOptions &opts) {
 
+  TaskScheduler *pSched{nullptr};
+
   std::shared_ptr<video_source::VideoSource> pSource{nullptr};
   if (opts.sourceUrl.scheme() == "http"sv ||
       opts.sourceUrl.scheme() == "https"sv) {
     pSource = std::make_shared<video_source::HttpVideoSource>(
         opts.sourceUrl, opts.sourceUsername, opts.sourcePassword);
   } else if (opts.sourceUrl.scheme() == "rtsp"sv) {
-    pSource = std::make_shared<video_source::Live555VideoSource>(
+    auto pLive555Source = std::make_shared<video_source::Live555VideoSource>(
         opts.sourceUrl, opts.sourceUsername, opts.sourcePassword);
+    pSched = pLive555Source->GetTaskSchedulerPtr();
+    pSource = pLive555Source;
   } else {
     throw std::runtime_error(
         std::format("Invalid scheme {} for URL",
@@ -102,14 +106,11 @@ void App(const util::ProgramOptions &opts) {
 
       pThreadedHassHandler->Start();
       pHassHandler = pThreadedHassHandler;
-    } else if (auto pLive555Source =
-                   std::dynamic_pointer_cast<video_source::Live555VideoSource>(
-                       pSource)) {
+    } else if (pSched) {
       // Optimize with Async
       LOGGER->info("Running Home Assistant callbacks in main event loop");
       auto pAsyncHassHandler = std::make_shared<callback::AsyncHassHandler>(
-          opts.hassUrl, opts.hassToken, opts.hassEntityId);
-      pAsyncHassHandler->Register(pLive555Source->GetTaskSchedulerPtr());
+          pSched, opts.hassUrl, opts.hassToken, opts.hassEntityId);
       pHassHandler = pAsyncHassHandler;
     }
 
@@ -125,25 +126,16 @@ void App(const util::ProgramOptions &opts) {
 
   std::shared_ptr<callback::AsyncFileSave> pFileSaveHandler;
   if (!opts.saveDestination.empty() && !opts.saveSourceUrl.empty()) {
-    if (auto pLive555Source =
-            std::dynamic_pointer_cast<video_source::Live555VideoSource>(
-                pSource)) {
+    if (pSched) {
       pFileSaveHandler = std::make_shared<callback::AsyncFileSave>(
-          opts.saveDestination, opts.saveSourceUrl, opts.sourceUsername,
+          pSched, opts.saveDestination, opts.saveSourceUrl, opts.sourceUsername,
           opts.sourcePassword);
+      pFileSaveHandler->Register();
       pFileSaveHandler->SetLimitSavedFilePaths(opts.saveImageLimit);
       auto onMotionDetectionCallbackSave =
-          [pFileSaveHandler,
-           previousRoiCount = 0](detector::Payload data) mutable {
-            // save on the rising edge of motion detection, rois goes from 0 to
-            // non-zero
-            if (previousRoiCount == 0 && data.rois.size() > 0) {
-              pFileSaveHandler->SaveFileAtEndpoint();
-            }
-            previousRoiCount = data.rois.size();
+          [pFileSaveHandler](detector::Payload data) {
+            (*pFileSaveHandler)(data);
           };
-
-      pFileSaveHandler->Register(pLive555Source->GetTaskSchedulerPtr());
       pDetector->Subscribe(onMotionDetectionCallbackSave);
       LOGGER->info("Saving motion detection images to {}",
                    opts.saveDestination);
@@ -151,6 +143,7 @@ void App(const util::ProgramOptions &opts) {
   }
 
   std::shared_ptr<gui::WebHandler> pWebHandler;
+  gui::WebHandler::SetSavedFilesServePath(opts.saveDestination);
   if (opts.webUiPort > 0 && !opts.webUiHost.empty()) {
     pWebHandler =
         std::make_shared<gui::WebHandler>(opts.webUiPort, opts.webUiHost);

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "Callback/AsyncDebouncer.h"
 #include "Callback/BaseHassHandler.h"
 #include "Callback/Context.h"
 
+#include <gsl/gsl>
 #include <memory>
 #include <string_view>
 #include <unordered_map>
@@ -16,11 +18,12 @@
 namespace callback {
 
 class AsyncHassHandler : public BaseHassHandler,
+                         protected AsyncDebouncer,
                          public std::enable_shared_from_this<AsyncHassHandler> {
 
 public:
-  AsyncHassHandler(const boost::url &url, const std::string &token,
-                   const std::string &entityId);
+  AsyncHassHandler(TaskScheduler *pSched, const boost::url &url,
+                   const std::string &token, const std::string &entityId);
   AsyncHassHandler(const AsyncHassHandler &) = delete;
   AsyncHassHandler(AsyncHassHandler &&) = delete;
   AsyncHassHandler &operator=(const AsyncHassHandler &) = delete;
@@ -28,14 +31,14 @@ public:
 
   virtual ~AsyncHassHandler() noexcept;
 
-  void Register(TaskScheduler *pSched);
+  void Register();
 
 protected:
   void UpdateState_Impl(std::string_view state,
                         const json &attributes) override;
 
 private:
-  TaskScheduler *pSched_{nullptr};
+  gsl::not_null<TaskScheduler *> pSched_;
   util::CurlMultiWrapper wCurlMulti_;
   TaskToken timeoutTaskToken_{};
 
@@ -44,9 +47,6 @@ private:
   std::unordered_map<size_t, std::shared_ptr<_CurlEasyContext>> easyCtxs_;
   std::unordered_map<curl_socket_t, std::shared_ptr<_CurlSocketContext>>
       socketCtxs_;
-
-  bool allowUpdate_{true};
-  TaskToken debounceTaskToken_{};
 
   void GetInitialState();
   void CheckMultiInfo();
@@ -60,7 +60,6 @@ private:
   static void BackgroundHandlerProc(void *curlSocketContext_clientData,
                                     int mask);
   static void TimeoutHandlerProc(void *asyncHassHandler_clientData);
-  static void DebounceUpdateProc(void *asyncHassHandler_clientData);
 };
 
 } // namespace callback

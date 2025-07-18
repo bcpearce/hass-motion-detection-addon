@@ -83,10 +83,9 @@ TEST_P(TestAsyncHassHandler, CanPostEntityUpdate) {
     std::barrier sync(2);
 
     auto binarySensor = std::make_shared<callback::AsyncHassHandler>(
-        SimServer::GetBaseUrl(), sim_token::bearer, entityId);
+        pSched_, SimServer::GetBaseUrl(), sim_token::bearer, entityId);
     binarySensor->debounceTime = 0s;
-
-    binarySensor->Register(pSched_);
+    binarySensor->Register();
 
     std::vector rois = {cv::Rect(50, 50, 50, 50)};
 
@@ -194,15 +193,19 @@ TEST_F(TestAsyncFileSave, CanSaveSimultaneousImages) {
       {{"width", std::to_string(width)}, {"height", std::to_string(height)}});
 
   auto asyncFileSave =
-      std::make_shared<callback::AsyncFileSave>(downloadDir_, url);
+      std::make_shared<callback::AsyncFileSave>(pSched_, downloadDir_, url);
+  asyncFileSave->debounceTime = 0s;
 
   static constexpr int imgLimit{20};
   asyncFileSave->SetLimitSavedFilePaths(imgLimit);
 
-  asyncFileSave->Register(pSched_);
+  asyncFileSave->Register();
 
   static constexpr int imgCount{25};
-  static constexpr int interval{200'000};
+  static constexpr int interval{
+      200'000}; // this interval is to handle a limitation with mongoose when it
+                // receives too many requests, this might not be required in
+                // practice with production servers
 
   for (int i{0}; i < imgCount; ++i) {
     pSched_->scheduleDelayedTask(i * interval, TestAsyncFileSave::DownloadFile,
@@ -219,6 +222,10 @@ TEST_F(TestAsyncFileSave, CanSaveSimultaneousImages) {
 
   pSched_->doEventLoop(&wv_);
 
+  EXPECT_EQ(asyncFileSave->GetPendingRequestOperations(), 0);
+  EXPECT_EQ(asyncFileSave->GetPendingFileOperations(), 0);
+  EXPECT_EQ(asyncFileSave->GetSavedFilePaths().size(), imgLimit);
+
   cv::Mat readImg;
   for (const auto &fs : asyncFileSave->GetSavedFilePaths()) {
     cv::imread(fs.string(), readImg, cv::IMREAD_UNCHANGED);
@@ -228,10 +235,6 @@ TEST_F(TestAsyncFileSave, CanSaveSimultaneousImages) {
     EXPECT_EQ(readImg.rows, height);
     EXPECT_EQ(readImg.channels(), 3);
   }
-
-  EXPECT_EQ(asyncFileSave->GetPendingRequestOperations(), 0);
-  EXPECT_EQ(asyncFileSave->GetPendingFileOperations(), 0);
-  EXPECT_EQ(asyncFileSave->GetSavedFilePaths().size(), imgLimit);
 }
 
 TEST_F(TestAsyncFileSave, CanSaveALargeImage) {
@@ -248,12 +251,12 @@ TEST_F(TestAsyncFileSave, CanSaveALargeImage) {
                   {"shapes", std::to_string(shapes)}});
 
   auto asyncFileSave =
-      std::make_shared<callback::AsyncFileSave>(downloadDir_, url);
+      std::make_shared<callback::AsyncFileSave>(pSched_, downloadDir_, url);
+  asyncFileSave->debounceTime = 0s;
 
   static constexpr int imgLimit{20};
   asyncFileSave->SetLimitSavedFilePaths(imgLimit);
-
-  asyncFileSave->Register(pSched_);
+  asyncFileSave->Register();
 
   pSched_->scheduleDelayedTask(1000, TestAsyncFileSave::DownloadFile,
                                asyncFileSave.get());

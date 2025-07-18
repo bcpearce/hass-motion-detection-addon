@@ -13,7 +13,10 @@
 #include <UsageEnvironment.hh>
 #include <boost/circular_buffer.hpp>
 #include <boost/url.hpp>
+#include <gsl/gsl>
 
+#include "Callback/AsyncDebouncer.h"
+#include "Detector/Detector.h"
 #include "Util/CurlMultiWrapper.h"
 #include "Util/CurlWrapper.h"
 
@@ -24,10 +27,11 @@
 
 namespace callback {
 
-class AsyncFileSave : public std::enable_shared_from_this<AsyncFileSave> {
+class AsyncFileSave : protected AsyncDebouncer,
+                      public std::enable_shared_from_this<AsyncFileSave> {
 
 public:
-  AsyncFileSave(const std::filesystem::path &dstPath,
+  AsyncFileSave(TaskScheduler *pSched, const std::filesystem::path &dstPath,
                 const boost::url &url = {}, const std::string &user = {},
                 const std::string &password = {});
   AsyncFileSave(const AsyncFileSave &) = delete;
@@ -37,8 +41,10 @@ public:
 
   virtual ~AsyncFileSave() noexcept;
 
-  void Register(TaskScheduler *pSched);
+  void Register();
   void SaveFileAtEndpoint(const std::filesystem::path &dst = {});
+
+  void operator()(detector::Payload data);
 
   size_t GetPendingRequestOperations() const { return socketCtxs_.size(); }
   size_t GetPendingFileOperations() const { return easyCtxs_.size(); }
@@ -49,7 +55,9 @@ public:
   void SetLimitSavedFilePaths(size_t limit);
 
   size_t defaultJpgBufferSize{2 * 1024 * 1024}; // default to 2Mb
-  size_t defaultSavedFilePathsSize{200};
+  static constexpr size_t defaultSavedFilePathsSize{200};
+
+  std::chrono::seconds debounceTime{30};
 
 private:
   boost::url url_;
@@ -91,8 +99,6 @@ private:
   std::vector<char> spareBuf_;
   std::unordered_map<curl_socket_t, std::shared_ptr<_CurlSocketContext>>
       socketCtxs_;
-
-  bool allowUpdate_{true};
 
   void CheckMultiInfo();
 

@@ -3,7 +3,7 @@
 }
 
 body {
-		font-family: sans-serif;
+		font-family: monospace;
 		background-color: light-dark(#ffffff, #1e1e1e);
 }
 
@@ -35,6 +35,23 @@ h1 {
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 		white-space: nowrap;
 		overflow: auto;
+}
+
+.pill-button {
+		background-color: #3140e8;
+		border: none;
+		color: white;
+		padding: 10px 20px;
+		text-align: center;
+		text-decoration: none;
+		display: inline-block;
+		margin: 4px 2px;
+		cursor: pointer;
+		border-radius: 16px;
+}
+
+.pill-button:hover {
+		background-color: #757eeb
 }
 
 @media (max-width: 600px) {
