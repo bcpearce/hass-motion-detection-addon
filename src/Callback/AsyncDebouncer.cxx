@@ -6,7 +6,7 @@ namespace callback {
 
 AsyncDebouncer::AsyncDebouncer(TaskScheduler *pSched) : pSched_{pSched} {}
 
-template <> void AsyncDebouncer::Debounce(std::chrono::microseconds delay) {
+void AsyncDebouncer::Debounce(std::chrono::microseconds delay) {
   if (delay.count() <= 0) {
     if (!updateAllowed_) {
       pSched_->unscheduleDelayedTask(taskToken_);

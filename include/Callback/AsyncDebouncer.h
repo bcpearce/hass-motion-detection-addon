@@ -21,7 +21,7 @@ public:
     Debounce(std::chrono::duration_cast<std::chrono::microseconds>(delay));
   }
 
-  template <> void Debounce(std::chrono::microseconds delay); // or reschedule
+  void Debounce(std::chrono::microseconds delay); // or reschedule
 
   [[nodiscard]] bool UpdateAllowed() const { return updateAllowed_; }
 
