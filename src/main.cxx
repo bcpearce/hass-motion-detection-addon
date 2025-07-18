@@ -111,6 +111,7 @@ void App(const util::ProgramOptions &opts) {
       LOGGER->info("Running Home Assistant callbacks in main event loop");
       auto pAsyncHassHandler = std::make_shared<callback::AsyncHassHandler>(
           pSched, opts.hassUrl, opts.hassToken, opts.hassEntityId);
+      pAsyncHassHandler->Register();
       pHassHandler = pAsyncHassHandler;
     }
 
