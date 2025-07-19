@@ -1,61 +1,107 @@
 :root {
-		color-scheme: light dark;
+  color-scheme: light dark;
 }
 
 body {
-		font-family: monospace;
-		background-color: light-dark(#ffffff, #1e1e1e);
+  font-family: monospace;
+  background-color: light-dark(#ffffff, #1e1e1e);
 }
 
 h1 {
-		padding-left: 30px;
-		color: light-dark(black, lightgray);
+  padding-left: 30px;
+  color: light-dark(black, lightgray);
 }
 
 .frame-container {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
-		gap: 10px;
-		padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
 }
 
 .frame-container img {
-		width: 100%;
-		max-width: 48%;
-		height: auto;
-		border-radius: 8px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 48%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .frame-container textarea {
-		width: 100%;
-		max-width: 96%;
-		border-radius: 8px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-		white-space: nowrap;
-		overflow: auto;
+  width: 100%;
+  max-width: 96%;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+  overflow: auto;
 }
 
 .pill-button {
-		background-color: #3140e8;
-		border: none;
-		color: white;
-		padding: 10px 20px;
-		text-align: center;
-		text-decoration: none;
-		display: inline-block;
-		margin: 4px 2px;
-		cursor: pointer;
-		border-radius: 16px;
+  background-color: #3140e8;
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 16px;
 }
 
 .pill-button:hover {
-		background-color: #757eeb
+  background-color: #757eeb;
 }
 
 @media (max-width: 600px) {
-		.frame-container img {
-				max-width: 100%;
-		}
+  .frame-container img {
+    max-width: 100%;
+  }
+}
+
+.visuallyhidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: auto;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+  white-space: nowrap;
+}
+
+nav {
+  border-top: 1px solid #eee;
+  margin-top: 1em;
+  padding-top: 0.5em;
+  font: 1.2em sans-serif;
+  display: flex;
+  justify-content: center;
+}
+
+.pagination {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+}
+
+.pagination li {
+  margin: 0 1px;
+}
+
+.pagination a {
+  display: block;
+  padding: 0.5em 1em;
+  border: 1px solid #999;
+  border-radius: 0.2em;
+  text-decoration: none;
+  background-color: #3140e8;
+}
+
+.pagination a[aria-current="page"] {
+  background-color: #757eeb;
+  color: #fff;
 }
