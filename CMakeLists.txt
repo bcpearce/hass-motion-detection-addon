@@ -9,6 +9,7 @@ include_directories(AFTER "${CMAKE_BINARY_DIR}/include")
 
 option(BUILD_TESTS "Build Tests" ON)
 if(BUILD_TESTS)
+  add_compile_definitions(BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
 endif()
 
@@ -56,13 +57,13 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+add_subdirectory(src/Callback)
 add_subdirectory(src/Detector)
 add_subdirectory(src/Gui)
-add_subdirectory(src/HomeAssistant)
 add_subdirectory(src/Util)
 add_subdirectory(src/VideoSource)
 
-set(PROJECT_SHARED_LIBS "Detector;Gui;HomeAssistant;Util;VideoSource")
+set(PROJECT_SHARED_LIBS "Detector;Gui;Callback;Util;VideoSource")
 
 target_link_libraries(
   MotionDetection PRIVATE ${PROJECT_SHARED_LIBS} opencv_core opencv_imgproc

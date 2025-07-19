@@ -1,5 +1,4 @@
-#ifndef INCLUDE_SIMSERVER_H
-#define INCLUDE_SIMSERVER_H
+#pragma once
 
 #include <mongoose.h>
 
@@ -19,7 +18,7 @@ protected:
   struct Token {};
 
 public:
-  static void Start(int port);
+  static void Start(int port) noexcept;
   static void Stop();
   static const boost::url &GetBaseUrl();
 
@@ -27,8 +26,7 @@ public:
   ~SimServer() noexcept = default;
 
   static int GetHassApiCount();
-  static std::future_status WaitForHassApiCount(int target,
-                                                std::chrono::seconds timeout);
+  static int WaitForHassApiCount(int target, std::chrono::seconds timeout);
   static void ev_handler(struct mg_connection *c, int ev, void *ev_data);
 
 protected:
@@ -38,5 +36,3 @@ protected:
   SimServer(SimServer &&) = delete;
   SimServer &operator=(SimServer &&) = delete;
 };
-
-#endif

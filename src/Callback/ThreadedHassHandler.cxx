@@ -1,13 +1,13 @@
 #include "Logger.h"
 
-#include "HomeAssistant/ThreadedHassHandler.h"
+#include "Callback/ThreadedHassHandler.h"
 
 #include <chrono>
 #include <format>
 #include <iostream>
 #include <string_view>
 
-#include "HomeAssistant/Json.h"
+#include "Callback/Json.h"
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
 
@@ -15,12 +15,14 @@ using namespace std::chrono_literals;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-namespace home_assistant {
+namespace callback {
 
 ThreadedHassHandler::ThreadedHassHandler(const boost::url &url,
                                          const std::string &token,
                                          const std::string &entityId)
     : BaseHassHandler(url, token, entityId) {}
+
+ThreadedHassHandler::~ThreadedHassHandler() noexcept { Stop(); }
 
 void ThreadedHassHandler::Start() {
   util::CurlWrapper wCurl;
@@ -73,4 +75,4 @@ void ThreadedHassHandler::UpdateState_Impl(std::string_view state,
   cv_.notify_all();
 }
 
-} // namespace home_assistant
+} // namespace callback

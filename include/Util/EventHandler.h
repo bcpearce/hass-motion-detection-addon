@@ -1,5 +1,4 @@
-#ifndef INCLUDE_UTIL_EVENT_HANDLER_H
-#define INCLUDE_UTIL_EVENT_HANDLER_H
+#pragma once
 
 #include <functional>
 #include <ranges>
@@ -34,5 +33,3 @@ private:
 };
 
 } // namespace util
-
-#endif // !INCLUDE_EVENT_HANDLER_H

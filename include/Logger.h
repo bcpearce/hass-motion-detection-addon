@@ -1,13 +1,13 @@
-#ifndef INCLUDE_LOGGER_H
-#define INCLUDE_LOGGER_H
+#pragma once
 
+#include <filesystem>
 #include <string_view>
 
 #include <boost/url.hpp>
 
-#include "spdlog/sinks/callback_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/sinks/callback_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 #define LOGGER spdlog::get("console")
 #define ERR_LOGGER spdlog::get("error")
@@ -52,4 +52,11 @@ struct fmt::formatter<boost::url> : fmt::formatter<std::string_view> {
   }
 };
 
-#endif
+template <>
+struct fmt::formatter<std::filesystem::path>
+    : fmt::formatter<std::string_view> {
+  auto format(const std::filesystem::path &path, format_context &ctx) const
+      -> decltype(ctx.out()) {
+    return fmt::format_to(ctx.out(), "{}", path.string());
+  }
+};

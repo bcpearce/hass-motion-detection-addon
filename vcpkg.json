@@ -1,5 +1,6 @@
 {
   "dependencies": [
+    "boost-circular-buffer",
     "boost-program-options",
     "boost-url",
     "curl",

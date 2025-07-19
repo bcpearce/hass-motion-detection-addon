@@ -1,6 +1,6 @@
-#ifndef INCLUDE_UTIL_PROGRAM_OPTIONS_H
-#define INCLUDE_UTIL_PROGRAM_OPTIONS_H
+#pragma once
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -10,12 +10,14 @@
 namespace util {
 
 struct ProgramOptions {
-  ProgramOptions() noexcept = default;
-  ProgramOptions(int argc, const char **argv);
-  boost::url url;
-  std::string token;
-  std::string username;
-  std::string password;
+
+  static std::variant<ProgramOptions, std::string>
+  ParseOptions(int argc, const char **argv);
+
+  boost::url sourceUrl;
+  std::string sourceToken;
+  std::string sourceUsername;
+  std::string sourcePassword;
 
   boost::url hassUrl{""};
   std::string hassEntityId;
@@ -27,10 +29,11 @@ struct ProgramOptions {
 
   std::variant<int, double> detectionSize = 0.05;
   std::chrono::seconds detectionDebounce{30};
+  std::filesystem::path saveDestination;
+  boost::url saveSourceUrl{""};
+  size_t saveImageLimit{200};
 
   [[nodiscard]] bool CanSetupHass() const;
 };
 
 } // namespace util
-
-#endif

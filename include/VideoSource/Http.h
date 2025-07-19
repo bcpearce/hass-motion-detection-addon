@@ -1,5 +1,4 @@
-#ifndef VIDEO_SOURCE_HTTP_H
-#define VIDEO_SOURCE_HTTP_H
+#pragma once
 
 #include "WindowsWrapper.h"
 
@@ -42,5 +41,3 @@ private:
 };
 
 } // namespace video_source
-
-#endif

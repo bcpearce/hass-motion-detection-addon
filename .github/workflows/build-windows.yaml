@@ -78,5 +78,5 @@ jobs:
       - name: Test Summary
         uses: test-summary/action@v2
         with:
-          paths: "test_detail_*.xml"
+          paths: "**/test_detail_*.xml"
         if: always()

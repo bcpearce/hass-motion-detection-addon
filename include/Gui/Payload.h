@@ -1,5 +1,4 @@
-#ifndef INCLUDE_GUI_PAYLOAD_H
-#define INCLUDE_GUI_PAYLOAD_H
+#pragma once
 
 #include <limits>
 
@@ -16,4 +15,3 @@ struct Payload {
   double fps{std::numeric_limits<double>::quiet_NaN()};
 };
 } // namespace gui
-#endif

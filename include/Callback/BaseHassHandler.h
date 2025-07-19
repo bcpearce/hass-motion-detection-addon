@@ -1,5 +1,4 @@
-#ifndef INCLUDE_HOME_ASSISTANT_BASE_HASS_HANDLER_H
-#define INCLUDE_HOME_ASSISTANT_BASE_HASS_HANDLER_H
+#pragma once
 
 #include "Detector/Detector.h"
 #include "Util/CurlWrapper.h"
@@ -13,7 +12,7 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
-namespace home_assistant {
+namespace callback {
 
 using json = nlohmann::json;
 
@@ -63,6 +62,4 @@ private:
   json nextState_ = {};
 };
 
-} // namespace home_assistant
-
-#endif //  INCLUDE_HOMEASSISTANT_HASS_HANDLER_H
+} // namespace callback

@@ -1,13 +1,13 @@
 #include "Logger.h"
 
-#include "HomeAssistant/SyncHassHandler.h"
+#include "Callback/SyncHassHandler.h"
 
 #include <chrono>
 #include <format>
 #include <iostream>
 #include <string_view>
 
-#include "HomeAssistant/Json.h"
+#include "Callback/Json.h"
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
 
@@ -15,7 +15,7 @@ using namespace std::chrono_literals;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-namespace home_assistant {
+namespace callback {
 
 SyncHassHandler::SyncHassHandler(const boost::url &url,
                                  const std::string &token,
@@ -38,4 +38,4 @@ void SyncHassHandler::UpdateState_Impl(std::string_view state,
   HandlePostResponse(wCurl, buf_);
 }
 
-} // namespace home_assistant
+} // namespace callback

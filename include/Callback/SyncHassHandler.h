@@ -1,16 +1,15 @@
-#ifndef INCLUDE_HOME_ASSISTANT_SYNC_HASS_HANDLER_H
-#define INCLUDE_HOME_ASSISTANT_SYNC_HASS_HANDLER_H
+#pragma once
 
 #include "Detector/Detector.h"
 
-#include "HomeAssistant/BaseHassHandler.h"
+#include "Callback/BaseHassHandler.h"
 
 #include <string>
 #include <string_view>
 
 #include <boost/url.hpp>
 
-namespace home_assistant {
+namespace callback {
 
 // A very basic handler for Home Assistant State Updates
 // This is useful for the final message as there is no requirement to overlap
@@ -35,6 +34,4 @@ private:
   std::vector<char> buf_; // for CURL responses
 };
 
-} // namespace home_assistant
-
-#endif // INCLUDE_HOME_ASSISTANT_THREADED_HASS_HANDLER_H
+} // namespace callback

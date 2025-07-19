@@ -1,5 +1,4 @@
-#ifndef INCLUDE_GUI_WEBHANDLER_H
-#define INCLUDE_GUI_WEBHANDLER_H
+#pragma once
 
 #include "Gui/Payload.h"
 
@@ -8,6 +7,7 @@
 #include <mongoose.h>
 #include <opencv2/core.hpp>
 
+#include <filesystem>
 #include <shared_mutex>
 #include <thread>
 #include <vector>
@@ -16,6 +16,10 @@ namespace gui {
 
 class WebHandler {
 public:
+  static void EventHandler(mg_connection *c, int ev, void *ev_data);
+  static void
+  SetSavedFilesServePath(const std::filesystem::path &savedFilesPath);
+
   explicit WebHandler(int port, std::string_view host = "0.0.0.0");
   WebHandler(const WebHandler &) = delete;
   WebHandler &operator=(const WebHandler &) = delete;
@@ -57,5 +61,3 @@ private:
 };
 
 } // namespace gui
-
-#endif

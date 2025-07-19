@@ -1,5 +1,4 @@
-#ifndef INCLUDE_UTIL_CURL_WRAPPER_H
-#define INCLUDE_UTIL_CURL_WRAPPER_H
+#pragma once
 
 #include <array>
 #include <exception>
@@ -50,5 +49,3 @@ private:
 };
 
 } // namespace util
-
-#endif

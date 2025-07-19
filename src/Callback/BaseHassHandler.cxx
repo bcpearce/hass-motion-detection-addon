@@ -1,17 +1,17 @@
 #include "Logger.h"
 
-#include "HomeAssistant/BaseHassHandler.h"
+#include "Callback/BaseHassHandler.h"
 
 #include <string>
 #include <string_view>
 
-#include "HomeAssistant/Json.h"
+#include "Callback/Json.h"
 #include "Util/BufferOperations.h"
 
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-namespace home_assistant {
+namespace callback {
 
 BaseHassHandler::BaseHassHandler(const boost::url &url,
                                  const std::string &token,
@@ -139,10 +139,7 @@ void BaseHassHandler::HandleGetResponse(util::CurlWrapper &wCurl,
 void BaseHassHandler::PreparePostRequest(util::CurlWrapper &wCurl,
                                          std::vector<char> &buf,
                                          std::string &payload) {
-  thread_local std::string_view payloadView;
-
   payload = nextState_.dump();
-  payloadView = payload;
 
   wCurl(curl_easy_setopt, CURLOPT_URL, url_.c_str());
   wCurl(curl_easy_setopt, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
@@ -152,7 +149,7 @@ void BaseHassHandler::PreparePostRequest(util::CurlWrapper &wCurl,
   wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
   wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
   wCurl(curl_easy_setopt, CURLOPT_READFUNCTION, util::SendBufferCallback);
-  wCurl(curl_easy_setopt, CURLOPT_READDATA, &payloadView);
+  wCurl(curl_easy_setopt, CURLOPT_READDATA, &payload);
 }
 
 void BaseHassHandler::HandlePostResponse(util::CurlWrapper &wCurl,
@@ -172,17 +169,19 @@ void BaseHassHandler::HandlePostResponse(util::CurlWrapper &wCurl,
   default: {
     char *ct{nullptr};
     wCurl(curl_easy_getinfo, CURLINFO_CONTENT_TYPE, &ct);
-    std::string_view ctVw{ct};
-    std::string_view contentTypeDesc =
-        ("application/xml"sv == ctVw || "application/json"sv == ctVw ||
-         ctVw.starts_with("text"))
-            ? std::string_view(buf.data(), buf.size())
-            : ""sv;
-    throw std::runtime_error(
-        std::format("Failed to update entity {} status with code {}: {}",
-                    entityId, code, contentTypeDesc));
+    if (ct) {
+      std::string_view ctVw{ct};
+      std::string_view contentTypeDesc =
+          ("application/xml"sv == ctVw || "application/json"sv == ctVw ||
+           ctVw.starts_with("text"))
+              ? std::string_view(buf.data(), buf.size())
+              : ""sv;
+      throw std::runtime_error(
+          std::format("Failed to update entity {} status with code {}: {}",
+                      entityId, code, contentTypeDesc));
+    }
   } break;
   }
 }
 
-} // namespace home_assistant
+} // namespace callback

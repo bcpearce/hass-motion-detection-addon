@@ -1,5 +1,4 @@
-#ifndef INCLUDE_MOTION_DETECTOR_H
-#define INCLUDE_MOTION_DETECTOR_H
+#pragma once
 
 #include "Detector/Detector.h"
 
@@ -76,5 +75,3 @@ private:
 };
 
 } // namespace detector
-
-#endif // !DETECTOR MOTION_DETECTOR_H

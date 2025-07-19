@@ -1,5 +1,4 @@
-#ifndef INCLUDE_VIDEO_SOURCE_H
-#define INCLUDE_VIDEO_SOURCE_H
+#pragma once
 
 #include <chrono>
 #include <string>
@@ -45,4 +44,3 @@ private:
 };
 
 } // namespace video_source
-#endif

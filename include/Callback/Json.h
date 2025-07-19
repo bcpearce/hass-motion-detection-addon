@@ -1,10 +1,9 @@
-#ifndef INCLUDE_HOME_ASSISTANT_JSON_H
-#define INCLUDE_HOME_ASSISTANT_JSON_H
+#pragma once
 
 #include <nlohmann/json.hpp>
 #include <opencv2/core/types.hpp>
 
-namespace home_assistant {
+namespace callback {
 
 inline void to_json(nlohmann::json &j, const cv::Rect &rect) {
   j = nlohmann::json{{"x", rect.x},
@@ -20,6 +19,4 @@ inline void from_json(const nlohmann::json &j, cv::Rect &rect) {
   rect.height = j.at("height").get<int>();
 }
 
-} // namespace home_assistant
-
-#endif
+} // namespace callback

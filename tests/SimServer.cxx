@@ -6,9 +6,12 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
+#include <barrier>
 #include <filesystem>
 #include <format>
+#include <random>
 
+using namespace std::chrono_literals;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
@@ -32,17 +35,51 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     if (mg_match(hm->uri, mg_str("/api/getimage"), nullptr)) {
       char argBuf[256];
 
-      struct mg_str widthStr = mg_http_var(hm->query, mg_str("width"));
-      struct mg_str heightStr = mg_http_var(hm->query, mg_str("height"));
+      mg_str widthStr = mg_http_var(hm->query, mg_str("width"));
+      mg_str heightStr = mg_http_var(hm->query, mg_str("height"));
+      mg_str shapesStr = mg_http_var(hm->query, mg_str("shapes"));
 
-      int width = std::stoi(std::string(widthStr.buf, widthStr.len));
-      int height = std::stoi(std::string(heightStr.buf, heightStr.len));
+      const int width = std::stoi(std::string(widthStr.buf, widthStr.len));
+      const int height = std::stoi(std::string(heightStr.buf, heightStr.len));
+      const int shapes =
+          std::string(shapesStr.buf, shapesStr.len).empty()
+              ? 90
+              : std::stoi(std::string(shapesStr.buf, shapesStr.len));
 
       thread_local cv::Mat image;
       thread_local std::vector<uint8_t> jpgBuf;
 
       image = cv::Mat(height, width, CV_8UC3);
-      image = cv::Scalar(0xFF, 0xFF, 0xFF);
+      image = cv::Scalar(0, 0, 0);
+
+      // Draw some random shapes
+      std::mt19937 rng(std::random_device{}());
+      std::uniform_int_distribution<int> distX(0, width);
+      std::uniform_int_distribution<int> distY(0, height);
+      std::uniform_int_distribution<int> color(0, 255);
+      for (int i = 0; i < shapes; ++i) {
+        const std::vector<cv::Point> pts = {
+            cv::Point(distX(rng), distY(rng)),
+            cv::Point(distX(rng), distY(rng)),
+            cv::Point(distX(rng), distY(rng)),
+        };
+        const int diameter = distX(rng);
+        switch (i % 3) {
+        case 0:
+          cv::rectangle(image, pts[0], pts[1],
+                        cv::Scalar(color(rng), color(rng), color(rng)), 3);
+          break;
+        case 1:
+          cv::circle(image, pts[0], diameter / 2,
+                     cv::Scalar(color(rng), color(rng), color(rng)), 3);
+          break;
+        case 2: {
+          std::vector ptsVec = {pts};
+          cv::polylines(image, ptsVec, true,
+                        cv::Scalar(color(rng), color(rng), color(rng)), 3);
+        } break;
+        }
+      }
 
       cv::imencode(".jpg", image, jpgBuf);
 
@@ -58,6 +95,7 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     } else if (mg_str entity_id[2];
                mg_match(hm->uri, mg_str("/api/states/*"), entity_id)) {
 
+      ++hassApiCalls_; // do before sending
       // handle auth
       std::array<char, 256> user;
       std::array<char, 256> pass;
@@ -91,7 +129,6 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
       } else {
         mg_http_reply(c, 401, "", "%s", "401: Unauthorized");
       }
-      ++hassApiCalls_;
     }
   }
 }
@@ -102,22 +139,25 @@ SimServer::SimServer(Token, int port) {
   url.set_port(std::to_string(port));
 }
 
-void SimServer::Start(int port) {
+void SimServer::Start(int port) noexcept {
   if (!pServer || url.port_number() != port) {
     pServer = std::make_unique<SimServer>(Token(), port);
   }
-  listenerThread = std::jthread([](std::stop_token stopToken) {
+  std::barrier sync(2);
+  listenerThread = std::jthread([&sync](std::stop_token stopToken) {
     struct mg_mgr mgr;
 #ifdef _DEBUG
     mg_log_set(MG_LL_DEBUG);
 #endif
     mg_mgr_init(&mgr);
     mg_http_listen(&mgr, url.c_str(), ev_handler, nullptr);
+    sync.arrive_and_drop();
     while (!stopToken.stop_requested()) {
       mg_mgr_poll(&mgr, 1000);
     }
     mg_mgr_free(&mgr);
   });
+  sync.arrive_and_wait();
 }
 
 void SimServer::Stop() { listenerThread = {}; }
@@ -126,14 +166,11 @@ const boost::url &SimServer::GetBaseUrl() { return url; }
 
 int SimServer::GetHassApiCount() { return hassApiCalls_.load(); }
 
-std::future_status
-SimServer::WaitForHassApiCount(int target, std::chrono::seconds timeout) {
-  auto fut = std::async(std::launch::async, [target] {
-    while (hassApiCalls_.load() != target) {
-      std::this_thread::yield();
-    }
-    return;
-  });
-  const auto res = fut.wait_for(timeout);
-  return res;
+int SimServer::WaitForHassApiCount(int target, std::chrono::seconds timeout) {
+  using sc = std::chrono::steady_clock;
+  int count = GetHassApiCount();
+  for (auto start = sc::now(); sc::now() - start < timeout && count != target;
+       count = GetHassApiCount())
+    ;
+  return count;
 }
