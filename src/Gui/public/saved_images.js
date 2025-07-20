@@ -4,8 +4,8 @@ const gallery = document.getElementById("gallery");
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 
-const page = urlParams.get("page") || 0;
-const imgsPerPage = urlParams.get("imgsPerPage") || 20;
+const page = Number(urlParams.get("page")) || 0;
+const imgsPerPage = Number(urlParams.get("imgsPerPage")) || 20;
 
 fetch(directoryPath)
     .then((response) => {
@@ -30,7 +30,9 @@ fetch(directoryPath)
         }
       });
 
-      insertPageLinks(links);
+      insertPageLinks(links, "page-list-top");
+      insertPageLinks(links, "page-list-bottom");
+
       const totalImageCount = document.getElementById("total-image-count");
       if (links.length > 0) {
         totalImageCount.innerHTML = `(${links.length})`;
@@ -50,9 +52,9 @@ fetch(directoryPath)
       });
     });
 
-const insertPageLinks = (links) => {
+const insertPageLinks = (links, listElementName) => {
   const pageCount = Math.ceil(links.length / imgsPerPage);
-  const pageList = document.getElementById("page-list");
+  const pageList = document.getElementById(listElementName);
 
   if (pageCount > 1 && page != 1) {
     const prevElement = document.createElement("li");
