@@ -145,8 +145,7 @@ public:
 
   ~FrameRtspClient() override {}
 
-  void RequestStop() { rVideoSource_.eventLoopWatchVar_ = 1; }
-
+  void RequestStop() { /* rVideoSource_.eventLoopWatchVar_ = 1;*/ }
   Live555VideoSource &rVideoSource_;
   StreamClientState scs;
 
@@ -287,7 +286,7 @@ private:
 
   DECODING_STATE res{dsBitstreamError};
   ISVCDecoder *pSvcDecoder_{nullptr};
-  unsigned char *pDataYUV_[3];
+  unsigned char *pDataYUV_[3]{nullptr, nullptr, nullptr};
   SBufferInfo sDstBufInfo_;
   SDecodingParam sDecParam_{};
 
@@ -297,36 +296,25 @@ private:
   Live555VideoSource &rVideoSource_;
 };
 
-Live555VideoSource::Live555VideoSource(const boost::url &url) : url_{url} {}
-
-Live555VideoSource::Live555VideoSource(const boost::url &url,
+Live555VideoSource::Live555VideoSource(std::shared_ptr<TaskScheduler> pSched,
+                                       const boost::url &url,
                                        std::string_view username,
                                        std::string_view password)
-    : url_{url} {
+    : pSched_{pSched}, url_{url} {
   if (!username.empty() && !password.empty()) {
     url_.set_user(username);
     url_.set_password(password);
   }
-  pScheduler_ = BasicTaskScheduler::createNew();
 }
 
-Live555VideoSource::~Live555VideoSource() {
-  eventLoopWatchVar_.store(1);
-  shutdownStream(pRtspClient_.release());
-  if (pEnv_) {
-    pEnv_->reclaim();
-  }
-  if (pScheduler_) {
-    delete pScheduler_;
-  }
-}
+Live555VideoSource::~Live555VideoSource() { StopStream(); }
 
 void Live555VideoSource::StartStream(unsigned long long maxFrames) {
   if (url_.empty()) {
     throw std::runtime_error("No URL specified");
   }
 
-  pEnv_ = BasicUsageEnvironment::createNew(*pScheduler_);
+  pEnv_ = BasicUsageEnvironment::createNew(*pSched_);
 
 // Open URL and establish connection
 #ifdef _DEBUG
@@ -343,12 +331,15 @@ void Live555VideoSource::StartStream(unsigned long long maxFrames) {
         "Failed to create RTSP client to connect to {}", tmpUrl.c_str()));
   }
   pRtspClient_->sendDescribeCommand(continueAfterDESCRIBE);
-  eventLoopWatchVar_ = 0;
   maxFrames_ = maxFrames;
-  pEnv_->taskScheduler().doEventLoop(&eventLoopWatchVar_);
 }
 
-void Live555VideoSource::StopStream() { eventLoopWatchVar_.store(1); }
+void Live555VideoSource::StopStream() {
+  shutdownStream(pRtspClient_.release());
+  if (pEnv_) {
+    pEnv_->reclaim();
+  }
+}
 
 void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
                                      int strideY, int strideUV, int timeStamp) {
@@ -632,7 +623,6 @@ void streamWatchdogHandler(void *clientData) {
   if (std::chrono::steady_clock::now() - client->lastUpdate > timeout) {
     LOGGER->error("Timeout waiting for next frame ({}) closing stream...",
                   timeout.count());
-    client->RequestStop();
     return;
   }
 
@@ -678,7 +668,6 @@ void shutdownStream(RTSPClient *rtspClient) {
   }
 
   LOGGER->info("{} Closing the stream.", *rtspClient);
-  client->RequestStop();
   Medium::close(rtspClient);
   // Note that this will also cause this stream's "StreamClientState"
   // structure to get reclaimed.

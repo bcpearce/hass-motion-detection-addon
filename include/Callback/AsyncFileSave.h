@@ -31,7 +31,8 @@ class AsyncFileSave : protected AsyncDebouncer,
                       public std::enable_shared_from_this<AsyncFileSave> {
 
 public:
-  AsyncFileSave(TaskScheduler *pSched, const std::filesystem::path &dstPath,
+  AsyncFileSave(std::shared_ptr<TaskScheduler> pSched,
+                const std::filesystem::path &dstPath,
                 const boost::url &url = {}, const std::string &user = {},
                 const std::string &password = {});
   AsyncFileSave(const AsyncFileSave &) = delete;
@@ -67,7 +68,7 @@ private:
 
   boost::circular_buffer<std::filesystem::path> savedFilePaths_;
 
-  TaskScheduler *pSched_{nullptr};
+  gsl::not_null<std::shared_ptr<TaskScheduler>> pSched_;
   util::CurlMultiWrapper wCurlMulti_;
   TaskToken token_{};
 

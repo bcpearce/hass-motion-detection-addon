@@ -9,22 +9,27 @@
 
 #include "Util/ProgramOptions.h"
 
+using namespace std::string_literals;
+using namespace std::string_view_literals;
+
 TEST(ProgramOptionsTests, Parse1) {
   std::vector<const char *> argv{"MotionDetection", "--source-url",
                                  "rtsp://feed.example.com:554"};
-  const auto progOpts = std::get<util::ProgramOptions>(
+  const util::ProgramOptions progOpts = std::get<util::ProgramOptions>(
       util::ProgramOptions::ParseOptions(argv.size(), argv.data()));
-  EXPECT_STREQ(progOpts.sourceUrl.c_str(), "rtsp://feed.example.com:554");
+  EXPECT_EQ(progOpts.feeds.at(0).sourceUrl.c_str(),
+            "rtsp://feed.example.com:554"sv);
 }
 
 TEST(ProgramOptionsTests, ParseDetectionSize) {
   std::vector<const char *> argv{"MotionDetection", "--source-url",
                                  "rtsp://feed.example.com:554",
                                  "--detection-size", "32.045%"};
-  const auto progOpts = std::get<util::ProgramOptions>(
+  const util::ProgramOptions progOpts = std::get<util::ProgramOptions>(
       util::ProgramOptions::ParseOptions(argv.size(), argv.data()));
-  EXPECT_THAT(progOpts.detectionSize, testing::VariantWith<double>(
-                                          testing::DoubleNear(0.32045, 0.001)));
+  EXPECT_THAT(
+      progOpts.feeds.at(0).detectionSize,
+      testing::VariantWith<double>(testing::DoubleNear(0.32045, 0.001)));
 }
 
 TEST(ProgramOptionsTests, CanSetupHass) {
@@ -32,7 +37,7 @@ TEST(ProgramOptionsTests, CanSetupHass) {
                                      "rtsp://feed.example.com:554"};
   const auto progOptsFalse = std::get<util::ProgramOptions>(
       util::ProgramOptions::ParseOptions(3, argvFalse));
-  EXPECT_FALSE(progOptsFalse.CanSetupHass())
+  EXPECT_FALSE(progOptsFalse.CanSetupHass(progOptsFalse.feeds.at(0)))
       << "Options " << argvFalse[0] << " " << argvFalse[1] << " "
       << argvFalse[2] << " will set up Hass endpoint, but should not";
 
@@ -48,7 +53,7 @@ TEST(ProgramOptionsTests, CanSetupHass) {
 
   const auto progOptsTrue = std::get<util::ProgramOptions>(
       util::ProgramOptions::ParseOptions(9, argvTrue));
-  EXPECT_TRUE(progOptsTrue.CanSetupHass());
+  EXPECT_TRUE(progOptsTrue.CanSetupHass(progOptsTrue.feeds.at(0)));
 }
 
 TEST(ProgramOptionsTests, CanSetupHassWithEnvironmentVariables) {
@@ -71,5 +76,5 @@ TEST(ProgramOptionsTests, CanSetupHassWithEnvironmentVariables) {
 
   const auto fromEnv = std::get<util::ProgramOptions>(
       util::ProgramOptions::ParseOptions(3, argv));
-  EXPECT_TRUE(fromEnv.CanSetupHass());
+  EXPECT_TRUE(fromEnv.CanSetupHass(fromEnv.feeds.at(0)));
 }

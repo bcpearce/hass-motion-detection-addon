@@ -55,7 +55,7 @@ void LogLastError() {
 
 namespace callback {
 
-AsyncFileSave::AsyncFileSave(TaskScheduler *pSched,
+AsyncFileSave::AsyncFileSave(std::shared_ptr<TaskScheduler> pSched,
                              const std::filesystem::path &dstPath,
                              const boost::url &url, const std::string &user,
                              const std::string &password)

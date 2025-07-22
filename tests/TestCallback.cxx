@@ -69,10 +69,11 @@ void Kickoff(void *clientData) {
 
 class TestAsyncHassHandler : public testing::TestWithParam<std::string_view> {
 protected:
-  void SetUp() override { pSched_ = BasicTaskScheduler::createNew(); }
-  void TearDown() override { delete pSched_; }
+  void SetUp() override {
+    pSched_ = decltype(pSched_)(BasicTaskScheduler::createNew());
+  }
 
-  TaskScheduler *pSched_{nullptr};
+  std::shared_ptr<TaskScheduler> pSched_;
 };
 
 TEST_P(TestAsyncHassHandler, CanPostEntityUpdate) {
@@ -138,7 +139,7 @@ INSTANTIATE_TEST_SUITE_P(EntityIds, TestSyncHassHandler, hassEntityIdValues);
 class TestAsyncFileSave : public testing::Test {
 protected:
   void SetUp() override {
-    pSched_ = BasicTaskScheduler::createNew();
+    pSched_ = decltype(pSched_)(BasicTaskScheduler::createNew());
     std::random_device rd;
     std::mt19937 engine(rd());
     std::uniform_int_distribution<unsigned int> dist(0x0000'0000, 0xFFFF'FFFF);
@@ -146,12 +147,9 @@ protected:
                    std::format("TestAsyncFileSave/{:08x}", dist(engine));
     std::filesystem::create_directories(downloadDir_);
   }
-  void TearDown() override {
-    std::filesystem::remove_all(downloadDir_);
-    delete pSched_;
-  }
+  void TearDown() override { std::filesystem::remove_all(downloadDir_); }
 
-  TaskScheduler *pSched_{nullptr};
+  std::shared_ptr<TaskScheduler> pSched_;
   std::filesystem::path downloadDir_;
   EventLoopWatchVariable wv_{0};
 
@@ -212,7 +210,7 @@ TEST_F(TestAsyncFileSave, CanSaveSimultaneousImages) {
                                  asyncFileSave.get());
   }
 
-  TryEndLoopData tryEndLoopData{asyncFileSave.get(), &wv_, pSched_};
+  TryEndLoopData tryEndLoopData{asyncFileSave.get(), &wv_, pSched_.get()};
 
   static constexpr auto timeout = 10'000'000us; // 10 seconds
 
@@ -261,7 +259,7 @@ TEST_F(TestAsyncFileSave, CanSaveALargeImage) {
   pSched_->scheduleDelayedTask(1000, TestAsyncFileSave::DownloadFile,
                                asyncFileSave.get());
 
-  TryEndLoopData tryEndLoopData{asyncFileSave.get(), &wv_, pSched_};
+  TryEndLoopData tryEndLoopData{asyncFileSave.get(), &wv_, pSched_.get()};
   pSched_->scheduleDelayedTask(1000, TryEndLoop, &tryEndLoopData);
 
   pSched_->scheduleDelayedTask((20'000'000us).count(), EndLoop,

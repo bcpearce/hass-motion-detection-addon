@@ -18,7 +18,7 @@ class WebHandler {
 public:
   static void EventHandler(mg_connection *c, int ev, void *ev_data);
   static void
-  SetSavedFilesServePath(const std::filesystem::path &savedFilesPath);
+  SetSavedFilesServePath(int i, const std::filesystem::path &savedFilesPath);
 
   explicit WebHandler(int port, std::string_view host = "0.0.0.0");
   WebHandler(const WebHandler &) = delete;

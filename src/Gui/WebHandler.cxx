@@ -21,7 +21,7 @@ static std::atomic_bool broadcastLogs{false};
 static struct mg_mgr *pMgr{nullptr};
 static unsigned long parentConnId{0};
 
-static std::filesystem::path savedFilesPath;
+static std::unordered_map<int, std::filesystem::path> savedFilesPath;
 
 static constexpr const char *mjpegHeaders =
     "HTTP/1.0 200 OK\r\n"
@@ -80,17 +80,22 @@ void WebHandler::EventHandler(mg_connection *c, int ev, void *ev_data) {
     } else if (mg_match(hm->uri, mg_str("/websocket"), nullptr)) {
       mg_ws_upgrade(c, hm, nullptr);
       c->data[0] = 'W';
-    } else if (struct mg_str *cap{nullptr};
-               mg_match(hm->uri, mg_str("/media/saved/*"), cap)) {
+    } else if (struct mg_str cap[2] = {mg_str(""), mg_str("")};
+               mg_match(hm->uri, mg_str("/media/saved/*/*"), cap)) {
+      const int savedFilesPathIndex =
+          std::stoi(std::string(cap[0].buf, cap[0].len));
       struct mg_http_serve_opts opts;
       memset(&opts, 0, sizeof(opts));
       thread_local std::string pathStr;
-      if (!cap || cap->len == 0) {
-        pathStr = std::format(".,/media/saved={}", savedFilesPath.string());
+      if (cap[1].len == 0) {
+        pathStr = std::format(".,/media/saved/{}={}", savedFilesPathIndex,
+                              savedFilesPath[savedFilesPathIndex].string());
         opts.root_dir = pathStr.c_str();
         mg_http_serve_dir(c, hm, &opts);
       } else {
-        pathStr = (savedFilesPath / std::string(cap->buf, cap->len)).string();
+        pathStr = (savedFilesPath[savedFilesPathIndex] /
+                   std::string(cap->buf, cap->len))
+                      .string();
         opts.mime_types = "jpg=image/jpg";
         mg_http_serve_file(c, hm, pathStr.c_str(), &opts);
       }
@@ -123,8 +128,8 @@ void WebHandler::EventHandler(mg_connection *c, int ev, void *ev_data) {
 }
 
 void WebHandler::SetSavedFilesServePath(
-    const std::filesystem::path &_savedFilesPath) {
-  savedFilesPath = _savedFilesPath;
+    int i, const std::filesystem::path &_savedFilesPath) {
+  savedFilesPath[i] = _savedFilesPath;
 }
 
 WebHandler::WebHandler(int port, std::string_view host) {

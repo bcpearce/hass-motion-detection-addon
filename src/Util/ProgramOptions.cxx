@@ -163,39 +163,48 @@ ProgramOptions::ParseOptions(int argc, const char **argv) {
   ProgramOptions options;
   try {
     po::notify(vm);
-    options.sourceUrl = boost::url(vm["source-url"].as<std::string>());
-    options.sourceUsername = vm["source-username"].as<std::string>();
-    options.sourcePassword = vm["source-password"].as<std::string>();
-    options.sourceToken = vm["source-token"].as<std::string>();
+
+    options.feeds.push_back(std::invoke([&vm] {
+      ProgramOptions::FeedOptions feedOptions;
+
+      feedOptions.sourceUrl = boost::url(vm["source-url"].as<std::string>());
+      feedOptions.sourceUsername = vm["source-username"].as<std::string>();
+      feedOptions.sourcePassword = vm["source-password"].as<std::string>();
+      feedOptions.sourceToken = vm["source-token"].as<std::string>();
+
+      feedOptions.hassEntityId = vm["hass-entity-id"].as<std::string>();
+      feedOptions.hassFriendlyName = vm["hass-friendly-name"].as<std::string>();
+      if (auto it = vm.find("detection-size"); it != vm.end()) {
+        const auto raw = it->second.as<std::string>();
+        if (raw.empty()) {
+          ; // no detection size specified, use default
+        } else if (raw.back() == '%') {
+          // percentage specified, save as double
+          feedOptions.detectionSize =
+              std::stod(raw.substr(0, raw.size() - 1)) / 100.0;
+        } else {
+          // integer specified, save as int
+          feedOptions.detectionSize = std::stoi(raw);
+        }
+      }
+      if (auto it = vm.find("detection-debounce"); it != vm.end()) {
+        feedOptions.detectionDebounce =
+            std::chrono::seconds{it->second.as<int>()};
+      }
+
+      feedOptions.saveDestination = vm["save-destination"].as<std::string>();
+      feedOptions.saveSourceUrl =
+          boost::url(vm["save-source-url"].as<std::string>());
+      feedOptions.saveImageLimit = vm["save-image-limit"].as<size_t>();
+
+      return feedOptions;
+    }));
 
     options.hassUrl = boost::url(vm["hass-url"].as<std::string>());
-    options.hassEntityId = vm["hass-entity-id"].as<std::string>();
-    options.hassFriendlyName = vm["hass-friendly-name"].as<std::string>();
     options.hassToken = vm["hass-token"].as<std::string>();
 
     options.webUiHost = vm["web-ui-host"].as<std::string>();
     options.webUiPort = vm["web-ui-port"].as<int>();
-
-    if (auto it = vm.find("detection-size"); it != vm.end()) {
-      const auto raw = it->second.as<std::string>();
-      if (raw.empty()) {
-        ; // no detection size specified, use default
-      } else if (raw.back() == '%') {
-        // percentage specified, save as double
-        options.detectionSize =
-            std::stod(raw.substr(0, raw.size() - 1)) / 100.0;
-      } else {
-        // integer specified, save as int
-        options.detectionSize = std::stoi(raw);
-      }
-    }
-    if (auto it = vm.find("detection-debounce"); it != vm.end()) {
-      options.detectionDebounce = std::chrono::seconds{it->second.as<int>()};
-    }
-
-    options.saveDestination = vm["save-destination"].as<std::string>();
-    options.saveSourceUrl = boost::url(vm["save-source-url"].as<std::string>());
-    options.saveImageLimit = vm["save-image-limit"].as<size_t>();
 
   } catch (const std::exception &e) {
     std::ostringstream oss;
@@ -205,8 +214,13 @@ ProgramOptions::ParseOptions(int argc, const char **argv) {
   return options;
 }
 
-bool ProgramOptions::CanSetupHass() const {
-  return !hassUrl.empty() && !hassEntityId.empty() && !hassToken.empty();
+bool ProgramOptions::CanSetupHass(const FeedOptions &feedOpts) const {
+  return !hassUrl.empty() && !feedOpts.hassEntityId.empty() &&
+         !hassToken.empty();
+}
+
+bool ProgramOptions::CanSetupFileSave(const FeedOptions &feedOpts) const {
+  return !feedOpts.saveDestination.empty() && !feedOpts.saveSourceUrl.empty();
 }
 
 } // namespace util
