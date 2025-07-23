@@ -1,0 +1,6 @@
+{
+  "feed_1": {
+    "detectionSize": "32.045%",
+    "sourceUrl": "rtsp://feed.example.com:554"
+  }
+}

@@ -11,7 +11,7 @@ namespace util {
 
 struct ProgramOptions {
 
-  static std::variant<ProgramOptions, std::string>
+  [[nodiscard]] static std::variant<ProgramOptions, std::string>
   ParseOptions(int argc, const char **argv);
 
   struct FeedOptions {
@@ -26,18 +26,24 @@ struct ProgramOptions {
     std::variant<int, double> detectionSize = 0.05;
     std::chrono::seconds detectionDebounce{30};
 
-    std::filesystem::path saveDestination;
     boost::url saveSourceUrl{""};
     size_t saveImageLimit{200};
+
+    [[nodiscard]] static auto ParseJson(const std::filesystem::path &json)
+        -> std::unordered_map<std::string, FeedOptions>;
+    [[nodiscard]] static auto ParseJson(std::string_view jsonSv)
+        -> std::unordered_map<std::string, FeedOptions>;
   };
 
-  std::vector<FeedOptions> feeds;
+  std::unordered_map<std::string, FeedOptions> feeds;
 
   boost::url hassUrl{""};
   std::string hassToken;
 
   std::string webUiHost{"0.0.0.0"};
   int webUiPort{32834};
+
+  std::filesystem::path saveDestination;
 
   [[nodiscard]] bool CanSetupHass(const FeedOptions &feedOpts) const;
   [[nodiscard]] bool CanSetupFileSave(const FeedOptions &feedOpts) const;

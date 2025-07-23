@@ -1,0 +1,6 @@
+{
+  "feed_1": {
+    "hassEntityId": "binary_sensor.hello",
+    "sourceUrl": "rtsp://feed.example.com:554"
+  }
+}

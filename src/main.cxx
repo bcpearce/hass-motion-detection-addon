@@ -75,8 +75,8 @@ void App(const util::ProgramOptions &opts) {
 
     std::vector<SourceAndHandlers> sources;
 
-    for (const auto &feedOpts : opts.feeds) {
-      LOGGER->info("Processing feed: {}", feedOpts.sourceUrl);
+    for (const auto &[feedId, feedOpts] : opts.feeds) {
+      LOGGER->info("Processing feed: {}", feedId);
 
       std::shared_ptr<video_source::VideoSource> pSource{nullptr};
       if (feedOpts.sourceUrl.scheme() == "http"sv ||
@@ -156,7 +156,7 @@ void App(const util::ProgramOptions &opts) {
       if (opts.CanSetupFileSave(feedOpts)) {
         if (pSched) {
           pFileSaveHandler = std::make_shared<callback::AsyncFileSave>(
-              pSched, feedOpts.saveDestination, feedOpts.saveSourceUrl,
+              pSched, opts.saveDestination / feedId, feedOpts.saveSourceUrl,
               feedOpts.sourceUsername, feedOpts.sourcePassword);
           pFileSaveHandler->Register();
           pFileSaveHandler->SetLimitSavedFilePaths(feedOpts.saveImageLimit);
@@ -166,14 +166,14 @@ void App(const util::ProgramOptions &opts) {
               };
           pDetector->Subscribe(onMotionDetectionCallbackSave);
           LOGGER->info("Saving motion detection images to {}",
-                       feedOpts.saveDestination);
+                       opts.saveDestination / feedId);
           sources.back().pFileSaveHandler = pFileSaveHandler;
         }
       }
 
       if (pWebHandler) {
         gui::WebHandler::SetSavedFilesServePath(sources.size() - 1,
-                                                feedOpts.saveDestination);
+                                                opts.saveDestination);
         auto onMotionDetectorCallbackGui = [pWebHandler, pDetector,
                                             pSource](detector::Payload data) {
           (*pWebHandler)({.rois = data.rois,
