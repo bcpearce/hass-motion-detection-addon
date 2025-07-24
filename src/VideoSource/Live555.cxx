@@ -614,7 +614,7 @@ void subsessionByeHandler(void *clientData, char const *reason) {
 }
 
 void streamWatchdogHandler(void *clientData) {
-  auto *client = std::bit_cast<FrameRtspClient *>(clientData);
+  auto *client = static_cast<FrameRtspClient *>(clientData);
 
   UsageEnvironment &env = client->envir(); // alias
   StreamClientState &scs = client->scs;    // alias

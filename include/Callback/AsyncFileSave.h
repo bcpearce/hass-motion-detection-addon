@@ -47,11 +47,18 @@ public:
 
   void operator()(detector::Payload data);
 
-  size_t GetPendingRequestOperations() const { return socketCtxs_.size(); }
-  size_t GetPendingFileOperations() const { return easyCtxs_.size(); }
+  [[nodiscard]] size_t GetPendingRequestOperations() const {
+    return socketCtxs_.size();
+  }
+  [[nodiscard]] size_t GetPendingFileOperations() const {
+    return easyCtxs_.size();
+  }
 
-  const boost::circular_buffer<std::filesystem::path> &
+  [[nodiscard]] const boost::circular_buffer<std::filesystem::path> &
   GetSavedFilePaths() const;
+  [[nodiscard]] const std::filesystem::path &GetDstPath() const noexcept {
+    return dstPath_;
+  }
 
   void SetLimitSavedFilePaths(size_t limit);
 

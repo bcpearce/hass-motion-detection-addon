@@ -172,14 +172,17 @@ void App(const util::ProgramOptions &opts) {
       }
 
       if (pWebHandler) {
-        gui::WebHandler::SetSavedFilesServePath(sources.size() - 1,
-                                                opts.saveDestination);
-        auto onMotionDetectorCallbackGui = [pWebHandler, pDetector,
-                                            pSource](detector::Payload data) {
+        if (pFileSaveHandler) {
+          gui::WebHandler::SetSavedFilesServePath(
+              feedId, pFileSaveHandler->GetDstPath());
+        }
+        auto onMotionDetectorCallbackGui = [pWebHandler, pDetector, pSource,
+                                            &feedId](detector::Payload data) {
           (*pWebHandler)({.rois = data.rois,
                           .frame = data.frame,
                           .detail = pDetector->GetModel(),
-                          .fps = pSource->GetFramesPerSecond()});
+                          .fps = pSource->GetFramesPerSecond(),
+                          .feedId = feedId});
         };
         pDetector->Subscribe(onMotionDetectorCallbackGui);
       }
