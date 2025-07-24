@@ -46,7 +46,7 @@ private:
     gsl::not_null<mg_mgr *> mgr;
     std::vector<uint8_t> jpgBuf;
     gsl::not_null<std::shared_mutex *> mtx;
-    std::array<char, 2> marker{'\0', -1};
+    std::array<char, 2> marker{'\0', char(-1)};
   };
 
   struct FeedImageData {
@@ -64,9 +64,9 @@ private:
     explicit FeedImageData(mg_mgr *mgr)
         : imageBroadcastData_{.mgr = mgr,
                               .mtx = &modelMtx_,
-                              .marker = {'L', -1}},
+                              .marker = {'L', char(-1)}},
           modelBroadcastData_{
-              .mgr = mgr, .mtx = &imageMtx_, .marker = {'M', -1}} {}
+              .mgr = mgr, .mtx = &imageMtx_, .marker = {'M', char(-1)}} {}
   };
 
   using BroadcastMap =
