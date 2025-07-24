@@ -13,5 +13,6 @@ struct Payload {
   video_source::Frame frame;
   cv::Mat detail;
   double fps{std::numeric_limits<double>::quiet_NaN()};
+  std::string_view feedId;
 };
 } // namespace gui

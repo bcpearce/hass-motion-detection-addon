@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <BasicUsageEnvironment.hh>
+
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
 
@@ -80,6 +82,7 @@ TEST(HttpVideoSourceTests, TestReceiveLargeFrame) {
 }
 
 TEST(Live555VideoSourceTests, Smoke) {
-  video_source::Live555VideoSource live555(boost::url(""));
+  auto pSched = std::shared_ptr<TaskScheduler>(BasicTaskScheduler::createNew());
+  video_source::Live555VideoSource live555(pSched, boost::url(""));
   EXPECT_THROW(live555.StartStream(0), std::runtime_error);
 }

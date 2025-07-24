@@ -8,6 +8,7 @@
 
 #include <UsageEnvironment.hh>
 #include <boost/url.hpp>
+#include <gsl/gsl>
 
 namespace video_source {
 
@@ -20,17 +21,15 @@ class Live555VideoSource : public VideoSource {
 
 public:
   Live555VideoSource() noexcept = default;
-  explicit Live555VideoSource(const boost::url &url);
-  Live555VideoSource(const boost::url &url, std::string_view username,
-                     std::string_view password);
+  Live555VideoSource(std::shared_ptr<TaskScheduler> pSched,
+                     const boost::url &url, std::string_view username = {},
+                     std::string_view password = {});
   ~Live555VideoSource() override;
 
   void StartStream(unsigned long long maxFrames =
                        std::numeric_limits<unsigned long long>::max()) override;
   void StopStream() override;
-  [[nodiscard]] bool IsActive() override { return eventLoopWatchVar_ == 0; }
-
-  TaskScheduler *GetTaskSchedulerPtr() { return pScheduler_; }
+  [[nodiscard]] bool IsActive() override { return bool(pRtspClient_); }
 
   const boost::url &GetUrl() const { return url_; };
 
@@ -42,9 +41,8 @@ private:
 
   boost::url url_;
   std::unique_ptr<FrameRtspClient> pRtspClient_;
-  TaskScheduler *pScheduler_{nullptr};
+  gsl::not_null<std::shared_ptr<TaskScheduler>> pSched_;
   UsageEnvironment *pEnv_{nullptr};
-  EventLoopWatchVariable eventLoopWatchVar_{1};
 };
 
 } // namespace video_source

@@ -4,7 +4,8 @@
 
 namespace callback {
 
-AsyncDebouncer::AsyncDebouncer(TaskScheduler *pSched) : pSched_{pSched} {}
+AsyncDebouncer::AsyncDebouncer(std::shared_ptr<TaskScheduler> pSched)
+    : pSched_{pSched} {}
 
 void AsyncDebouncer::Debounce(std::chrono::microseconds delay) {
   if (delay.count() <= 0) {

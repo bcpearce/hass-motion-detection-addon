@@ -21,7 +21,8 @@ static size_t contextId{1};
 
 namespace callback {
 
-AsyncHassHandler::AsyncHassHandler(TaskScheduler *pSched, const boost::url &url,
+AsyncHassHandler::AsyncHassHandler(std::shared_ptr<TaskScheduler> pSched,
+                                   const boost::url &url,
                                    const std::string &token,
                                    const std::string &entityId)
     : BaseHassHandler(url, token, entityId), AsyncDebouncer(pSched),

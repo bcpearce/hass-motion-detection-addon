@@ -6,12 +6,20 @@
     <title>Detection Feed and Model</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="index.js" defer></script>
+    <script src="load_feed.js" defer></script>
   </head>
   <body>
     <h1>Detection Live and Model</h1>
+    <h2>
+        <label for="feeds">Select a Feed:</label>
+        <select name="feeds" id="feed-selector" onchange="loadFeed(this.value)">
+            <option value="">Select Feed...</option>
+            <!--Insert Feeds Here-->
+        </select>
+    </h2>
     <div class="frame-container">
-      <img src="/media/live" alt="Live Feed" />
-      <img src="/media/model" alt="Detection Model" />
+      <img src="#" id="img-live" alt="Live Feed" />
+      <img src="#" id="img-model" alt="Detection Model" />
     </div>
     <div class="frame-container">
       <textarea id="logs" rows="4" readonly wrap="soft"> </textarea>

@@ -42,6 +42,7 @@ void HttpVideoSource::StartStream(unsigned long long maxFrames) {
   if (isActive_) {
     throw std::runtime_error("HTTP stream is already running");
   }
+
   isActive_ = true;
   while (isActive_.load() && GetFrameCount() < maxFrames) {
     try {
