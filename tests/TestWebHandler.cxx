@@ -36,7 +36,7 @@ protected:
 
 TEST_P(WebHandlerTests, CanSetImage) {
 
-  gui::Payload data;
+  gui::Payload data{.feedId = "test"sv};
 
   const int matType{GetParam()};
 

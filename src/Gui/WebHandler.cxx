@@ -233,7 +233,8 @@ const boost::url &WebHandler::GetUrl() const noexcept { return url_; }
 
 void WebHandler::operator()(Payload data) {
 
-  if (!feedIds.contains(data.feedId)) {
+  if (!feedIds.contains(data.feedId) ||
+      !feedImageDataMap_.contains(data.feedId)) {
     std::scoped_lock lk(feedMappingMtx);
     if (feedMarker < 0) {
       // maximum feeds of 128, log an error and early exit
@@ -243,14 +244,22 @@ void WebHandler::operator()(Payload data) {
       }
       return;
     }
-    const char thisFeedMarker = feedMarker++;
+    const char thisFeedMarker = feedMarker;
 
-    auto [it, didInsert_unused] = feedIds.insert({data.feedId, thisFeedMarker});
-    feedImageDataMap_[it->first] = std::make_unique<FeedImageData>(&mgr_);
-    feedImageDataMap_[it->first]->imageBroadcastData_.marker[1] =
-        thisFeedMarker;
-    feedImageDataMap_[it->first]->modelBroadcastData_.marker[1] =
-        thisFeedMarker;
+    const auto [feedIdIt, didInsert_feedId] =
+        feedIds.insert({data.feedId, thisFeedMarker});
+    if (didInsert_feedId) {
+      ++feedMarker;
+    }
+    auto [feedDataIt, didInsert_feedData] = feedImageDataMap_.insert(
+        {data.feedId, std::make_unique<FeedImageData>(&mgr_)});
+    if (!didInsert_feedData) {
+      throw std::runtime_error(
+          std::format("Failed to add feed data with ID {}", thisFeedMarker));
+    } else {
+      feedDataIt->second->imageBroadcastData_.marker[1] = thisFeedMarker;
+      feedDataIt->second->modelBroadcastData_.marker[1] = thisFeedMarker;
+    }
 
     LOGGER->info("Feed {} available at Web GUI", data.feedId);
   }
