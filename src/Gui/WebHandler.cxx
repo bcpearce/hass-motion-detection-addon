@@ -13,8 +13,6 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <set>
-
 using namespace std::string_view_literals;
 
 using json = nlohmann::json;
