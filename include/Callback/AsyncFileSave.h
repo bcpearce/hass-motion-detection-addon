@@ -31,7 +31,8 @@ class AsyncFileSave : protected AsyncDebouncer,
                       public std::enable_shared_from_this<AsyncFileSave> {
 
 public:
-  AsyncFileSave(TaskScheduler *pSched, const std::filesystem::path &dstPath,
+  AsyncFileSave(std::shared_ptr<TaskScheduler> pSched,
+                const std::filesystem::path &dstPath,
                 const boost::url &url = {}, const std::string &user = {},
                 const std::string &password = {});
   AsyncFileSave(const AsyncFileSave &) = delete;
@@ -46,11 +47,18 @@ public:
 
   void operator()(detector::Payload data);
 
-  size_t GetPendingRequestOperations() const { return socketCtxs_.size(); }
-  size_t GetPendingFileOperations() const { return easyCtxs_.size(); }
+  [[nodiscard]] size_t GetPendingRequestOperations() const {
+    return socketCtxs_.size();
+  }
+  [[nodiscard]] size_t GetPendingFileOperations() const {
+    return easyCtxs_.size();
+  }
 
-  const boost::circular_buffer<std::filesystem::path> &
+  [[nodiscard]] const boost::circular_buffer<std::filesystem::path> &
   GetSavedFilePaths() const;
+  [[nodiscard]] const std::filesystem::path &GetDstPath() const noexcept {
+    return dstPath_;
+  }
 
   void SetLimitSavedFilePaths(size_t limit);
 
@@ -67,7 +75,7 @@ private:
 
   boost::circular_buffer<std::filesystem::path> savedFilePaths_;
 
-  TaskScheduler *pSched_{nullptr};
+  gsl::not_null<std::shared_ptr<TaskScheduler>> pSched_;
   util::CurlMultiWrapper wCurlMulti_;
   TaskToken token_{};
 

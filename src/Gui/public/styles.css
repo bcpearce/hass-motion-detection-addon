@@ -7,9 +7,15 @@ body {
   background-color: light-dark(#ffffff, #1e1e1e);
 }
 
-h1 {
+h1,
+h2 {
   padding-left: 30px;
   color: light-dark(black, lightgray);
+}
+
+select {
+  font-family: monospace;
+  font-size: 1.5em;
 }
 
 .frame-container {

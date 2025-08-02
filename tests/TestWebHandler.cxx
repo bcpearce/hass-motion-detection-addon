@@ -2,22 +2,41 @@
 
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <unordered_set>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#define JSON_USE_IMPLICIT_CONVERSIONS 0
+#include <nlohmann/json.hpp>
 
 #include "Gui/Payload.h"
 #include "Gui/WebHandler.h"
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
 
-class WebHandlerTests : public testing::TestWithParam<int> {};
+using namespace std::string_literals;
+using namespace std::string_view_literals;
+
+using json = nlohmann::json;
+
+class WebHandlerTests : public testing::TestWithParam<int> {
+protected:
+  void SetUp() override {
+    pWh_ = std::make_unique<gui::WebHandler>(32836);
+    pWh_->Start();
+  }
+
+  void TearDown() override { pWh_->Stop(); }
+
+  std::string GetServerUrl() const { return "http://localhost:32836"s; }
+
+  std::unique_ptr<gui::WebHandler> pWh_;
+};
 
 TEST_P(WebHandlerTests, CanSetImage) {
 
-  gui::WebHandler wh(32835);
-  wh.Start();
-
-  gui::Payload data;
+  gui::Payload data{.feedId = "test"sv};
 
   const int matType{GetParam()};
 
@@ -29,16 +48,10 @@ TEST_P(WebHandlerTests, CanSetImage) {
   data.detail = cv::Mat::zeros(400, 400, matType);
   data.fps = 30.0;
 
-  EXPECT_NO_THROW(wh(data));
-  wh.Stop();
+  EXPECT_NO_THROW((*pWh_)(data));
 }
 
-INSTANTIATE_TEST_SUITE_P(ImageTypes, WebHandlerTests,
-                         testing::Values(CV_8UC1, CV_8UC3, CV_8UC4));
-
-TEST(FilesystemTest, CanAccessPackedFilesystem) {
-  gui::WebHandler wh(32836);
-  wh.Start();
+TEST_F(WebHandlerTests, CanAccessPackedFilesystem) {
 
   // read the packed index.html to compare later
   const auto indexPath =
@@ -55,13 +68,36 @@ TEST(FilesystemTest, CanAccessPackedFilesystem) {
   util::CurlWrapper wCurl;
   std::vector<char> buf;
   EXPECT_NO_THROW(std::invoke([&] {
-    wCurl(curl_easy_setopt, CURLOPT_URL, "http://localhost:32836/");
+    wCurl(curl_easy_setopt, CURLOPT_URL, GetServerUrl().c_str());
     wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
     wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
     wCurl(curl_easy_perform);
   }));
 
   EXPECT_EQ(std::string_view(buf), std::string_view(expected));
-
-  wh.Stop();
 }
+
+TEST_F(WebHandlerTests, LoadAndReadBackFeedIds) {
+  (*pWh_)({.feedId = "feed1"sv});
+  (*pWh_)({.feedId = "feed2"sv});
+  (*pWh_)({.feedId = "feed3"sv});
+
+  util::CurlWrapper wCurl;
+  std::vector<char> buf;
+  EXPECT_NO_THROW(std::invoke([&] {
+    const auto url = GetServerUrl() + "/media/feeds"s;
+    wCurl(curl_easy_setopt, CURLOPT_URL, url.c_str());
+    wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
+    wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
+    wCurl(curl_easy_perform);
+  }));
+
+  json res = json::parse(buf);
+
+  EXPECT_THAT(res, testing::Contains("feed1"));
+  EXPECT_THAT(res, testing::Contains("feed2"));
+  EXPECT_THAT(res, testing::Contains("feed3"));
+}
+
+INSTANTIATE_TEST_SUITE_P(ImageTypes, WebHandlerTests,
+                         testing::Values(CV_8UC1, CV_8UC3, CV_8UC4));

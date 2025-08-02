@@ -22,7 +22,7 @@ class AsyncHassHandler : public BaseHassHandler,
                          public std::enable_shared_from_this<AsyncHassHandler> {
 
 public:
-  AsyncHassHandler(TaskScheduler *pSched, const boost::url &url,
+  AsyncHassHandler(std::shared_ptr<TaskScheduler> pSched, const boost::url &url,
                    const std::string &token, const std::string &entityId);
   AsyncHassHandler(const AsyncHassHandler &) = delete;
   AsyncHassHandler(AsyncHassHandler &&) = delete;
@@ -38,7 +38,7 @@ protected:
                         const json &attributes) override;
 
 private:
-  gsl::not_null<TaskScheduler *> pSched_;
+  gsl::not_null<std::shared_ptr<TaskScheduler>> pSched_;
   util::CurlMultiWrapper wCurlMulti_;
   TaskToken timeoutTaskToken_{};
 

@@ -55,12 +55,15 @@ void LogLastError() {
 
 namespace callback {
 
-AsyncFileSave::AsyncFileSave(TaskScheduler *pSched,
+AsyncFileSave::AsyncFileSave(std::shared_ptr<TaskScheduler> pSched,
                              const std::filesystem::path &dstPath,
                              const boost::url &url, const std::string &user,
                              const std::string &password)
     : AsyncDebouncer(pSched), pSched_{pSched}, dstPath_{dstPath}, url_{url},
       user_{user}, password_{password} {
+  if (!std::filesystem::exists(dstPath_)) {
+    std::filesystem::create_directories(dstPath_);
+  }
   spareBuf_.reserve(defaultJpgBufferSize);
   savedFilePaths_.set_capacity(defaultSavedFilePathsSize);
 }
@@ -262,8 +265,9 @@ void AsyncFileSave::CheckMultiInfo() {
             LOGGER->info("CURL Request failed with response code {}",
                          responseCode);
             std::filesystem::remove(pCtx->writeData.dstPath);
+            wCurlMulti(curl_multi_remove_handle, pCtx->wCurl.pCurl_);
             RemoveContext(pCtx.get());
-            break;
+            return;
           }
         } catch (const std::exception &e) {
           LOGGER->error(e.what());

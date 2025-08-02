@@ -13,6 +13,8 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
+using namespace std::string_view_literals;
+
 using json = nlohmann::json;
 
 namespace {
@@ -21,7 +23,11 @@ static std::atomic_bool broadcastLogs{false};
 static struct mg_mgr *pMgr{nullptr};
 static unsigned long parentConnId{0};
 
-static std::filesystem::path savedFilesPath;
+static std::shared_mutex feedMappingMtx;
+static std::unordered_map<std::string_view, std::filesystem::path>
+    savedFilesPath;
+static std::unordered_map<std::string_view, char> feedIds;
+static std::atomic_char feedMarker{1};
 
 static constexpr const char *mjpegHeaders =
     "HTTP/1.0 200 OK\r\n"
@@ -29,35 +35,53 @@ static constexpr const char *mjpegHeaders =
     "Pragma: no-cache\r\n"
     "Content-Type: multipart/x-mixed-replace; boundary=--boundary\r\n\r\n";
 
-void BroadcastMjpegFrame(gui::WebHandler::BroadcastImageData *broadcastData) {
+char SafeGetFeedId(mg_str &cap) {
+  std::shared_lock lk(feedMappingMtx);
+  const auto it = feedIds.find({cap.buf, cap.len});
+  if (it != feedIds.end()) {
+    return it->second;
+  }
+  return 0;
+}
 
-  mg_mgr *mgr = broadcastData->mgr;
-  std::vector<uint8_t> &jpgBuf = broadcastData->jpgBuf;
-  const auto marker = broadcastData->marker;
-  std::shared_mutex *mtx = broadcastData->mtx;
+} // namespace
 
-  for (mg_connection *c = mgr->conns; c != nullptr; c = c->next) {
-    if (c->data[0] == marker && !jpgBuf.empty()) {
-      std::shared_lock lk(*mtx);
-      mg_printf(c,
-                "--boundary\r\nContent-Type: image/jpeg\r\n"
-                "Content-Length: %lu\r\n\r\n",
-                jpgBuf.size());
-      mg_send(c, jpgBuf.data(), jpgBuf.size());
-      mg_send(c, "\r\n", 2);
+namespace gui {
+
+void WebHandler::BroadcastMjpegFrame(
+    gui::WebHandler::BroadcastMap *broadcastMap) {
+
+  for (const auto &imageData : *broadcastMap | std::views::values) {
+    std::array<BroadcastImageData *, 2> ds{&imageData->imageBroadcastData_,
+                                           &imageData->modelBroadcastData_};
+    for (const auto &broadcastData : ds) {
+
+      mg_mgr *mgr = broadcastData->mgr;
+      std::vector<uint8_t> &jpgBuf = broadcastData->jpgBuf;
+      const auto marker = broadcastData->marker;
+      std::shared_mutex *mtx = broadcastData->mtx;
+
+      for (mg_connection *c = mgr->conns; c != nullptr; c = c->next) {
+        if (std::ranges::equal(std::span(c->data, 2), marker) &&
+            !jpgBuf.empty()) {
+          std::shared_lock lk(*mtx);
+          mg_printf(c,
+                    "--boundary\r\nContent-Type: image/jpeg\r\n"
+                    "Content-Length: %lu\r\n\r\n",
+                    jpgBuf.size());
+          mg_send(c, jpgBuf.data(), jpgBuf.size());
+          mg_send(c, "\r\n", 2);
+        }
+      }
     }
   }
 }
 
-static void BroadcastImage_TimerCallback(void *arg) {
+void WebHandler::BroadcastImage_TimerCallback(void *arg) {
   if (arg) {
-    BroadcastMjpegFrame(
-        static_cast<gui::WebHandler::BroadcastImageData *>(arg));
+    BroadcastMjpegFrame(static_cast<gui::WebHandler::BroadcastMap *>(arg));
   }
 }
-} // namespace
-
-namespace gui {
 
 // HTTP server event handler function
 void WebHandler::EventHandler(mg_connection *c, int ev, void *ev_data) {
@@ -71,26 +95,43 @@ void WebHandler::EventHandler(mg_connection *c, int ev, void *ev_data) {
     break;
   case MG_EV_HTTP_MSG: {
     struct mg_http_message *hm = static_cast<mg_http_message *>(ev_data);
-    if (mg_match(hm->uri, mg_str("/media/live"), nullptr)) {
+    struct mg_str cap[2] = {mg_str(""), mg_str("")};
+
+    if (mg_match(hm->uri, mg_str("/media/feeds"), nullptr)) {
+      json feeds = json::array();
+      std::ranges::copy(feedIds | std::views::keys, std::back_inserter(feeds));
+      mg_http_reply(c, 200, "Content-Type: application/json\r\n",
+                    feeds.dump().c_str());
+    } else if (mg_match(hm->uri, mg_str("/media/live/*"), cap)) {
       c->data[0] = 'L';
+      c->data[1] = SafeGetFeedId(cap[0]);
       mg_printf(c, "%s", mjpegHeaders);
-    } else if (mg_match(hm->uri, mg_str("/media/model"), nullptr)) {
+    } else if (mg_match(hm->uri, mg_str("/media/model/*"), cap)) {
       c->data[0] = 'M';
+      c->data[1] = SafeGetFeedId(cap[0]);
       mg_printf(c, "%s", mjpegHeaders);
     } else if (mg_match(hm->uri, mg_str("/websocket"), nullptr)) {
       mg_ws_upgrade(c, hm, nullptr);
       c->data[0] = 'W';
-    } else if (struct mg_str *cap{nullptr};
-               mg_match(hm->uri, mg_str("/media/saved/*"), cap)) {
+    } else if (mg_match(hm->uri, mg_str("/media/saved/*/*"), cap)) {
+      const auto &cSavedFilesPath = savedFilesPath;
+      const std::string_view savedFilesSlug(cap[0].buf, cap[0].len);
+      if (savedFilesSlug.empty() || !cSavedFilesPath.contains(savedFilesSlug)) {
+        mg_http_reply(c, 404, "", "Saved Media Slug Not Found");
+        return;
+      }
       struct mg_http_serve_opts opts;
       memset(&opts, 0, sizeof(opts));
       thread_local std::string pathStr;
-      if (!cap || cap->len == 0) {
-        pathStr = std::format(".,/media/saved={}", savedFilesPath.string());
+      const std::string_view savedFilesPath(cap[1].buf, cap[1].len);
+      if (savedFilesPath.empty() || savedFilesSlug == "null"sv) {
+        pathStr = std::format(".,/media/saved/{}/={}", savedFilesSlug,
+                              cSavedFilesPath.at(savedFilesSlug).string());
         opts.root_dir = pathStr.c_str();
         mg_http_serve_dir(c, hm, &opts);
       } else {
-        pathStr = (savedFilesPath / std::string(cap->buf, cap->len)).string();
+        pathStr =
+            (cSavedFilesPath.at(savedFilesSlug) / savedFilesPath).string();
         opts.mime_types = "jpg=image/jpg";
         mg_http_serve_file(c, hm, pathStr.c_str(), &opts);
       }
@@ -121,10 +162,14 @@ void WebHandler::EventHandler(mg_connection *c, int ev, void *ev_data) {
   } break;
   }
 }
-
+/// <summary>
+///
+/// </summary>
+/// <param name="slug"></param>
+/// <param name="_savedFilesPath"></param>
 void WebHandler::SetSavedFilesServePath(
-    const std::filesystem::path &_savedFilesPath) {
-  savedFilesPath = _savedFilesPath;
+    std::string_view slug, const std::filesystem::path &_savedFilesPath) {
+  savedFilesPath[slug] = _savedFilesPath;
 }
 
 WebHandler::WebHandler(int port, std::string_view host) {
@@ -144,9 +189,7 @@ void WebHandler::Start() {
 #endif
     mg_mgr_init(&mgr_);
     mg_timer_add(&mgr_, 33, MG_TIMER_REPEAT, BroadcastImage_TimerCallback,
-                 &imageBroadcastData_);
-    mg_timer_add(&mgr_, 33, MG_TIMER_REPEAT, BroadcastImage_TimerCallback,
-                 &modelBroadcastData_);
+                 &feedImageDataMap_);
     mg_wakeup_init(&mgr_);
     sync.arrive_and_drop();
     mg_http_listen(&mgr_, url_.c_str(), EventHandler, nullptr);
@@ -165,10 +208,12 @@ void WebHandler::Start() {
         thread_local json wsMsg = {};
         thread_local std::string dumped;
 
-        wsMsg["level"] =
+        wsMsg["log"] = {};
+
+        wsMsg["log"]["level"] =
             std::string_view(spdlog::level::to_string_view(msg.level));
-        wsMsg["payload"] = std::string_view(msg.payload);
-        wsMsg["timestamp"] = std::format("{}", msg.time);
+        wsMsg["log"]["payload"] = std::string_view(msg.payload);
+        wsMsg["log"]["timestamp"] = std::format("{}", msg.time);
         dumped = wsMsg.dump();
 
         if (broadcastLogs) {
@@ -185,44 +230,82 @@ void WebHandler::Stop() { listenerThread_ = {}; }
 const boost::url &WebHandler::GetUrl() const noexcept { return url_; }
 
 void WebHandler::operator()(Payload data) {
-  switch (data.frame.img.channels()) {
-  case 1:
-    cv::cvtColor(data.frame.img, imageBgr_, cv::COLOR_GRAY2BGR);
-    cv::cvtColor(data.detail, modelBgr_, cv::COLOR_GRAY2BGR);
-    break;
-  case 3:
-    data.frame.img.copyTo(imageBgr_);
-    data.detail.copyTo(modelBgr_);
-    break;
-  case 4:
-    cv::cvtColor(data.frame.img, imageBgr_, cv::COLOR_BGRA2BGR);
-    cv::cvtColor(data.detail, modelBgr_, cv::COLOR_BGRA2BGR);
-    break;
-  default:
-    throw std::invalid_argument("Frame must be BGR, BGRA, or Monochrome");
+
+  if (!feedIds.contains(data.feedId) ||
+      !feedImageDataMap_.contains(data.feedId)) {
+    std::scoped_lock lk(feedMappingMtx);
+    if (feedMarker < 0) {
+      // maximum feeds of 128, log an error and early exit
+      static bool warnOnce{false};
+      if (!warnOnce) {
+        LOGGER->warn("Maximum feed count reached, cannot add {}", data.feedId);
+      }
+      return;
+    }
+    const char thisFeedMarker = feedMarker;
+
+    const auto [feedIdIt, didInsert_feedId] =
+        feedIds.insert({data.feedId, thisFeedMarker});
+    if (didInsert_feedId) {
+      ++feedMarker;
+    }
+    auto [feedDataIt, didInsert_feedData] = feedImageDataMap_.insert(
+        {data.feedId, std::make_unique<FeedImageData>(&mgr_)});
+    if (!didInsert_feedData) {
+      throw std::runtime_error(
+          std::format("Failed to add feed data with ID {}", thisFeedMarker));
+    } else {
+      feedDataIt->second->imageBroadcastData_.marker[1] = thisFeedMarker;
+      feedDataIt->second->modelBroadcastData_.marker[1] = thisFeedMarker;
+    }
+
+    LOGGER->info("Feed {} available at Web GUI", data.feedId);
   }
 
-  for (const auto &bbox : data.rois) {
-    cv::rectangle(imageBgr_, bbox, cv::Scalar(0x00, 0xFF, 0x00), 1);
-  }
+  auto &fi = feedImageDataMap_.at(data.feedId);
+  if (!data.frame.img.empty()) {
+    switch (data.frame.img.channels()) {
+    case 1:
+      cv::cvtColor(data.frame.img, fi->imageBgr_, cv::COLOR_GRAY2BGR);
+      cv::cvtColor(data.detail, fi->modelBgr_, cv::COLOR_GRAY2BGR);
+      break;
+    case 3:
+      data.frame.img.copyTo(fi->imageBgr_);
+      data.detail.copyTo(fi->modelBgr_);
+      break;
+    case 4:
+      cv::cvtColor(data.frame.img, fi->imageBgr_, cv::COLOR_BGRA2BGR);
+      cv::cvtColor(data.detail, fi->modelBgr_, cv::COLOR_BGRA2BGR);
+      break;
+    default:
+      throw std::invalid_argument("Frame must be BGR, BGRA, or Monochrome");
+    }
 
-  thread_local std::string txt;
-  txt = std::format(
-      "Frame: {} | Objects: {}{}", data.frame.id, data.rois.size(),
-      std::isnormal(data.fps) ? std::format(" | FPS: {:.1f}", data.fps) : "");
-  cv::Point2i anchor{int(imageBgr_.cols * 0.05), int(imageBgr_.rows * 0.05)};
-  cv::putText(modelBgr_, txt, anchor, cv::HersheyFonts::FONT_HERSHEY_SIMPLEX,
-              0.5, cv::Scalar(0x00), 3);
-  cv::putText(modelBgr_, txt, anchor, cv::HersheyFonts::FONT_HERSHEY_SIMPLEX,
-              0.5, cv::Scalar(0x00, 0xFF, 0xFF), 1);
+    for (const auto &bbox : data.rois) {
+      cv::rectangle(fi->imageBgr_, bbox, cv::Scalar(0x00, 0xFF, 0x00), 1);
+    }
 
-  if (auto lk = std::unique_lock(imageMtx_)) {
-    cv::imencode(".jpg", imageBgr_, imageJpeg_);
-    std::swap(imageJpeg_, imageBroadcastData_.jpgBuf);
-  }
-  if (auto lk = std::unique_lock(modelMtx_)) {
-    cv::imencode(".jpg", modelBgr_, modelJpeg_);
-    std::swap(modelJpeg_, modelBroadcastData_.jpgBuf);
+    thread_local std::string txt;
+    txt = std::format(
+        "Frame: {} | Objects: {}{}", data.frame.id, data.rois.size(),
+        std::isnormal(data.fps) ? std::format(" | FPS: {:.1f}", data.fps) : "");
+    cv::Point2i anchor{int(fi->imageBgr_.cols * 0.05),
+                       int(fi->imageBgr_.rows * 0.05)};
+    cv::putText(fi->modelBgr_, txt, anchor,
+                cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0x00),
+                3);
+    cv::putText(fi->modelBgr_, txt, anchor,
+                cv::HersheyFonts::FONT_HERSHEY_SIMPLEX, 0.5,
+                cv::Scalar(0x00, 0xFF, 0xFF), 1);
+
+    if (auto lk = std::unique_lock(fi->imageMtx_)) {
+      cv::imencode(".jpg", fi->imageBgr_, fi->imageJpeg_);
+      std::swap(fi->imageJpeg_, fi->imageBroadcastData_.jpgBuf);
+    }
+    if (auto lk = std::unique_lock(fi->modelMtx_)) {
+      cv::imencode(".jpg", fi->modelBgr_, fi->modelJpeg_);
+      std::swap(fi->modelJpeg_, fi->modelBroadcastData_.jpgBuf);
+    }
   }
 }
 

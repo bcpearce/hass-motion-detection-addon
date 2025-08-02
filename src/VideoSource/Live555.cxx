@@ -95,7 +95,7 @@ void continueAfterPLAY(RTSPClient *rtspClient, int resultCode,
 void subsessionAfterPlaying(
     void *clientData); // called when a stream's subsession (e.g., audio or
                        // video substream) ends
-void subsessionByeHandler(void *clientData, char const *reason);
+void subsessionByeHandler(void *clientData, const char *reason);
 // called when a RTCP "BYE" is received for a subsession
 void streamWatchdogHandler(void *clientData);
 
@@ -129,7 +129,7 @@ protected:
 public:
   static std::unique_ptr<FrameRtspClient>
   createNew(UsageEnvironment &env, Live555VideoSource &videoSource,
-            int verbosityLevel = 0, char const *applicationName = NULL,
+            int verbosityLevel = 0, const char *applicationName = NULL,
             portNumBits tunnelOverHTTPPortNum = 0) {
     return std::make_unique<FrameRtspClient>(Token(), env, videoSource,
                                              verbosityLevel, applicationName,
@@ -137,15 +137,13 @@ public:
   }
 
   FrameRtspClient(Token, UsageEnvironment &env, Live555VideoSource &videoSource,
-                  int verbosityLevel, char const *applicationName,
+                  int verbosityLevel, const char *applicationName,
                   portNumBits tunnelOverHTTPPortNum)
       : RTSPClient(env, videoSource.url_.c_str(), verbosityLevel,
                    applicationName, tunnelOverHTTPPortNum, -1),
         rVideoSource_(videoSource) {}
 
   ~FrameRtspClient() override {}
-
-  void RequestStop() { rVideoSource_.eventLoopWatchVar_ = 1; }
 
   Live555VideoSource &rVideoSource_;
   StreamClientState scs;
@@ -230,9 +228,15 @@ private:
          !rSubsession_.rtpSource()->hasBeenSynchronizedUsingRTCP())
             ? "!"sv
             : ""sv;
+
+    const auto rtspClientRepr =
+        rVideoSource_.pRtspClient_
+            ? fmt::format("{}", *rVideoSource_.pRtspClient_)
+            : "<none>";
+
     LOGGER->debug("{} {} ({}):\tReceived {} bytes{} \tPresentation time: "
                   "{}.{:06d}{}\tNPT: {}",
-                  *rVideoSource_.pRtspClient_, rSubsession_,
+                  rtspClientRepr, rSubsession_,
                   rVideoSource_.GetCurrentFrame().id + 1, frameSize,
                   truncatedMsg, presentationTime.tv_sec,
                   presentationTime.tv_usec, syncMarker,
@@ -287,7 +291,7 @@ private:
 
   DECODING_STATE res{dsBitstreamError};
   ISVCDecoder *pSvcDecoder_{nullptr};
-  unsigned char *pDataYUV_[3];
+  unsigned char *pDataYUV_[3]{nullptr, nullptr, nullptr};
   SBufferInfo sDstBufInfo_;
   SDecodingParam sDecParam_{};
 
@@ -297,36 +301,25 @@ private:
   Live555VideoSource &rVideoSource_;
 };
 
-Live555VideoSource::Live555VideoSource(const boost::url &url) : url_{url} {}
-
-Live555VideoSource::Live555VideoSource(const boost::url &url,
+Live555VideoSource::Live555VideoSource(std::shared_ptr<TaskScheduler> pSched,
+                                       const boost::url &url,
                                        std::string_view username,
                                        std::string_view password)
-    : url_{url} {
+    : pSched_{pSched}, url_{url} {
   if (!username.empty() && !password.empty()) {
     url_.set_user(username);
     url_.set_password(password);
   }
-  pScheduler_ = BasicTaskScheduler::createNew();
 }
 
-Live555VideoSource::~Live555VideoSource() {
-  eventLoopWatchVar_.store(1);
-  shutdownStream(pRtspClient_.release());
-  if (pEnv_) {
-    pEnv_->reclaim();
-  }
-  if (pScheduler_) {
-    delete pScheduler_;
-  }
-}
+Live555VideoSource::~Live555VideoSource() { StopStream(); }
 
 void Live555VideoSource::StartStream(unsigned long long maxFrames) {
   if (url_.empty()) {
     throw std::runtime_error("No URL specified");
   }
 
-  pEnv_ = BasicUsageEnvironment::createNew(*pScheduler_);
+  pEnv_ = BasicUsageEnvironment::createNew(*pSched_);
 
 // Open URL and establish connection
 #ifdef _DEBUG
@@ -336,19 +329,18 @@ void Live555VideoSource::StartStream(unsigned long long maxFrames) {
 #endif
   pRtspClient_ = FrameRtspClient::createNew(*pEnv_, *this, VERBOSITY_LEVEL,
                                             "Motion-Detector");
-  if (!pRtspClient_) {
-    auto tmpUrl = url_;
-    tmpUrl.set_password("********");
-    throw std::runtime_error(std::format(
-        "Failed to create RTSP client to connect to {}", tmpUrl.c_str()));
-  }
   pRtspClient_->sendDescribeCommand(continueAfterDESCRIBE);
-  eventLoopWatchVar_ = 0;
   maxFrames_ = maxFrames;
-  pEnv_->taskScheduler().doEventLoop(&eventLoopWatchVar_);
 }
 
-void Live555VideoSource::StopStream() { eventLoopWatchVar_.store(1); }
+void Live555VideoSource::StopStream() {
+  if (pRtspClient_) {
+    shutdownStream(pRtspClient_.release());
+  }
+  if (pEnv_) {
+    pEnv_->reclaim();
+  }
+}
 
 void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
                                      int strideY, int strideUV, int timeStamp) {
@@ -394,24 +386,27 @@ void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
 
 void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode,
                            char *resultString) {
+  auto upResultString = std::unique_ptr<char>(resultString);
+  auto *frameRtspClient = dynamic_cast<FrameRtspClient *>(rtspClient);
+  if (!frameRtspClient) {
+    return;
+  }
   do {
-    UsageEnvironment &env = rtspClient->envir();                   // alias
-    StreamClientState &scs = ((FrameRtspClient *)rtspClient)->scs; // alias
+    UsageEnvironment &env = frameRtspClient->envir(); // alias
+    StreamClientState &scs = frameRtspClient->scs;    // alias
 
     if (resultCode != 0) {
       LOGGER->error("{} Failed to get a SDP description: {}", *rtspClient,
                     resultString);
-      delete[] resultString;
       break;
     }
 
-    char *const sdpDescription = resultString;
+    const char *sdpDescription = resultString;
     LOGGER->info("{} Got an SDP description:", *rtspClient);
     LOGGER->info("{}", sdpDescription);
 
     // Create a media session object from this SDP description:
     scs.session = MediaSession::createNew(env, sdpDescription);
-    delete[] sdpDescription; // because we don't need it anymore
     if (scs.session == nullptr) {
       LOGGER->error("{} Failed to create a MediaSession object from the SDP "
                     "description: {}",
@@ -434,7 +429,7 @@ void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode,
   } while (0);
 
   // An unrecoverable error occurred with this stream.
-  shutdownStream(rtspClient);
+  frameRtspClient->rVideoSource_.StopStream();
 }
 
 // By default, we request that the server stream its data using RTP/UDP.
@@ -443,11 +438,15 @@ void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode,
 #define REQUEST_STREAMING_OVER_TCP False
 
 void setupNextSubsession(RTSPClient *rtspClient) {
+  auto *frameRtspClient = dynamic_cast<FrameRtspClient *>(rtspClient);
+  if (!frameRtspClient) {
+    return;
+  }
   UsageEnvironment &env = rtspClient->envir();                   // alias
   StreamClientState &scs = ((FrameRtspClient *)rtspClient)->scs; // alias
 
   scs.subsession = scs.iter->next();
-  if (scs.subsession != nullptr) {
+  if (scs.subsession) {
     if (!scs.subsession->initiate()) {
       LOGGER->error("{} Failed to initiate the \"{}\" subsession: {}",
                     *rtspClient, *scs.subsession, env.getResultMsg());
@@ -473,7 +472,7 @@ void setupNextSubsession(RTSPClient *rtspClient) {
 
   // We've finished setting up all of the subsessions.  Now, send a RTSP
   // "PLAY" command to start the streaming:
-  if (scs.session->absStartTime() != NULL) {
+  if (scs.session->absStartTime()) {
     // Special case: The stream is indexed by 'absolute' time, so send an
     // appropriate "PLAY" command:
     rtspClient->sendPlayCommand(*scs.session, continueAfterPLAY,
@@ -487,8 +486,12 @@ void setupNextSubsession(RTSPClient *rtspClient) {
 
 void continueAfterSETUP(RTSPClient *rtspClient, int resultCode,
                         char *resultString) {
+  auto upResultString = std::unique_ptr<char>(resultString);
+  auto *frameRtspClient = dynamic_cast<FrameRtspClient *>(rtspClient);
+  if (!frameRtspClient) {
+    return;
+  }
   do {
-    auto *frameRtspClient = static_cast<FrameRtspClient *>(rtspClient);
     UsageEnvironment &env = rtspClient->envir();   // alias
     StreamClientState &scs = frameRtspClient->scs; // alias
 
@@ -540,7 +543,6 @@ void continueAfterSETUP(RTSPClient *rtspClient, int resultCode,
           subsessionByeHandler, scs.subsession);
     }
   } while (0);
-  delete[] resultString;
 
   // Set up the next subsession, if any:
   setupNextSubsession(rtspClient);
@@ -549,11 +551,15 @@ void continueAfterSETUP(RTSPClient *rtspClient, int resultCode,
 void continueAfterPLAY(RTSPClient *rtspClient, int resultCode,
                        char *resultString) {
   Boolean success = False;
-  auto *client = dynamic_cast<FrameRtspClient *>(rtspClient);
+  auto upResultString = std::unique_ptr<char>(resultString);
+  auto *frameRtspClient = dynamic_cast<FrameRtspClient *>(rtspClient);
+  if (!frameRtspClient) {
+    return;
+  }
 
   do {
-    UsageEnvironment &env = rtspClient->envir(); // alias
-    StreamClientState &scs = client->scs;        // alias
+    UsageEnvironment &env = rtspClient->envir();   // alias
+    StreamClientState &scs = frameRtspClient->scs; // alias
 
     if (resultCode != 0) {
       LOGGER->error("{} Failed to start playing session: {}", *rtspClient,
@@ -568,47 +574,53 @@ void continueAfterPLAY(RTSPClient *rtspClient, int resultCode,
     // Set up a watchdog timer to make sure the stream is receiving timely
     // updates, otherwise stop waiting and close
     scs.streamTimerTask = env.taskScheduler().scheduleDelayedTask(
-        client->waitForFrame.count(), (TaskFunc *)streamWatchdogHandler,
-        rtspClient);
+        frameRtspClient->waitForFrame.count(),
+        (TaskFunc *)streamWatchdogHandler, rtspClient);
 
     success = True;
   } while (0);
-  delete[] resultString;
 
   if (!success) {
     // An unrecoverable error occurred with this stream.
-    shutdownStream(rtspClient);
+    frameRtspClient->rVideoSource_.StopStream();
   }
 }
 
 // Implementation of the other event handlers:
 
 void subsessionAfterPlaying(void *clientData) {
-  MediaSubsession *subsession = (MediaSubsession *)clientData;
-  RTSPClient *rtspClient = (RTSPClient *)(subsession->miscPtr);
+  if (!clientData) {
+    return;
+  }
+  MediaSubsession *subsession = static_cast<MediaSubsession *>(clientData);
+  auto *frameRtspClient = static_cast<FrameRtspClient *>(subsession->miscPtr);
+  if (!frameRtspClient || !subsession) {
+    return;
+  }
 
   // Begin by closing this subsession's stream:
   Medium::close(subsession->sink);
-  subsession->sink = NULL;
+  subsession->sink = nullptr;
 
   // Next, check whether *all* subsessions' streams have now been closed:
   MediaSession &session = subsession->parentSession();
   MediaSubsessionIterator iter(session);
   while ((subsession = iter.next()) != NULL) {
-    if (subsession->sink != NULL)
+    if (!subsession->sink) {
       return; // this subsession is still active
+    }
   }
 
   // All subsessions' streams have now been closed, so shutdown the client:
-  shutdownStream(rtspClient);
+  frameRtspClient->rVideoSource_.StopStream();
 }
 
-void subsessionByeHandler(void *clientData, char const *reason) {
+void subsessionByeHandler(void *clientData, const char *reason) {
   MediaSubsession *subsession = (MediaSubsession *)clientData;
   RTSPClient *rtspClient = (RTSPClient *)subsession->miscPtr;
   UsageEnvironment &env = rtspClient->envir(); // alias
 
-  if (reason != nullptr) {
+  if (reason) {
     LOGGER->warn(
         "{} Received RTCP \"BYE\" (REASON:\"{}\") on \"{}\" subsession",
         *rtspClient, reason, *subsession);
@@ -623,7 +635,7 @@ void subsessionByeHandler(void *clientData, char const *reason) {
 }
 
 void streamWatchdogHandler(void *clientData) {
-  auto *client = std::bit_cast<FrameRtspClient *>(clientData);
+  auto *client = static_cast<FrameRtspClient *>(clientData);
 
   UsageEnvironment &env = client->envir(); // alias
   StreamClientState &scs = client->scs;    // alias
@@ -632,7 +644,7 @@ void streamWatchdogHandler(void *clientData) {
   if (std::chrono::steady_clock::now() - client->lastUpdate > timeout) {
     LOGGER->error("Timeout waiting for next frame ({}) closing stream...",
                   timeout.count());
-    client->RequestStop();
+    client->rVideoSource_.StopStream();
     return;
   }
 
@@ -645,25 +657,25 @@ void shutdownStream(RTSPClient *rtspClient) {
     // no client to shutdown
     return;
   }
-  auto *client = dynamic_cast<FrameRtspClient *>(rtspClient);
-  UsageEnvironment &env = client->envir(); // alias
-  StreamClientState &scs = client->scs;    // alias
+  auto *frameRtspClient = dynamic_cast<FrameRtspClient *>(rtspClient);
+  UsageEnvironment &env = frameRtspClient->envir(); // alias
+  StreamClientState &scs = frameRtspClient->scs;    // alias
 
   // First, check whether any subsessions have still to be closed:
-  if (scs.session != NULL) {
+  if (scs.session != nullptr) {
     Boolean someSubsessionsWereActive = False;
     MediaSubsessionIterator iter(*scs.session);
     MediaSubsession *subsession;
 
-    while ((subsession = iter.next()) != NULL) {
-      if (subsession->sink != NULL) {
+    while ((subsession = iter.next())) {
+      if (subsession->sink) {
         Medium::close(subsession->sink);
-        subsession->sink = NULL;
+        subsession->sink = nullptr;
 
-        if (subsession->rtcpInstance() != NULL) {
+        if (subsession->rtcpInstance()) {
           subsession->rtcpInstance()->setByeHandler(
-              NULL, NULL); // in case the server sends a RTCP "BYE" while
-                           // handling "TEARDOWN"
+              nullptr, nullptr); // in case the server sends a RTCP "BYE" while
+                                 // handling "TEARDOWN"
         }
 
         someSubsessionsWereActive = True;
@@ -673,12 +685,11 @@ void shutdownStream(RTSPClient *rtspClient) {
     if (someSubsessionsWereActive) {
       // Send a RTSP "TEARDOWN" command, to tell the server to shutdown the
       // stream. Don't bother handling the response to the "TEARDOWN".
-      rtspClient->sendTeardownCommand(*scs.session, NULL);
+      rtspClient->sendTeardownCommand(*scs.session, nullptr);
     }
   }
 
   LOGGER->info("{} Closing the stream.", *rtspClient);
-  client->RequestStop();
   Medium::close(rtspClient);
   // Note that this will also cause this stream's "StreamClientState"
   // structure to get reclaimed.

@@ -9,7 +9,7 @@ namespace callback {
 
 class AsyncDebouncer {
 public:
-  explicit AsyncDebouncer(TaskScheduler *pSched);
+  explicit AsyncDebouncer(std::shared_ptr<TaskScheduler> pSched);
   AsyncDebouncer(const AsyncDebouncer &) = delete;
   AsyncDebouncer(AsyncDebouncer &&) = delete;
   AsyncDebouncer &operator=(const AsyncDebouncer &) = delete;
@@ -28,7 +28,7 @@ public:
 private:
   static void DebounceUpdateProc(void *asyncDebouncer_clientData);
 
-  gsl::not_null<TaskScheduler *> pSched_;
+  gsl::not_null<std::shared_ptr<TaskScheduler>> pSched_;
   TaskToken taskToken_{nullptr};
   bool updateAllowed_{true};
 };

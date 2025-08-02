@@ -1,0 +1,16 @@
+{
+  "feed_1": {
+    "detectionSize": "32.045%",
+    "sourceUrl": "rtsp://feed_1.example.com:554"
+  },
+  "feed_2": {
+    "detectionDebounce": 30,
+    "detectionSize": 1500,
+    "hassEntityId": "binary_sensor.feed_2",
+    "hassFriendlyName": "Feed 2",
+    "saveImageLimit": 200,
+    "sourcePassword": "a_fine_word",
+    "sourceUrl": "rtsp://feed_2.example.com:554",
+    "sourceUsername": "username"
+  }
+}
