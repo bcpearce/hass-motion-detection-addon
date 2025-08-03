@@ -196,7 +196,7 @@ void AsyncFileSave::SetLimitSavedFilePaths(size_t limit) {
 
 #if _WIN32
 
-AsyncFileSave::Win32Overlapped::~Win32Overlapped() {
+AsyncFileSave::Win32Overlapped::~Win32Overlapped() noexcept {
   if (hFile != INVALID_HANDLE_VALUE && !CloseHandle(hFile)) {
     const auto error = GetLastError();
     LOGGER->error("Failed to close {} with error ({}): {}", dstPath, error,

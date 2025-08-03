@@ -312,7 +312,7 @@ Live555VideoSource::Live555VideoSource(std::shared_ptr<TaskScheduler> pSched,
   }
 }
 
-Live555VideoSource::~Live555VideoSource() { StopStream(); }
+Live555VideoSource::~Live555VideoSource() { StopStream_Impl(); }
 
 void Live555VideoSource::StartStream(unsigned long long maxFrames) {
   if (url_.empty()) {
@@ -333,14 +333,7 @@ void Live555VideoSource::StartStream(unsigned long long maxFrames) {
   maxFrames_ = maxFrames;
 }
 
-void Live555VideoSource::StopStream() {
-  if (pRtspClient_) {
-    shutdownStream(pRtspClient_.release());
-  }
-  if (pEnv_) {
-    pEnv_->reclaim();
-  }
-}
+void Live555VideoSource::StopStream() { StopStream_Impl(); }
 
 void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
                                      int strideY, int strideUV, int timeStamp) {
@@ -381,6 +374,15 @@ void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
     this->SetFrame(frame);
   } catch (const std::exception &e) {
     LOGGER->error(e.what());
+  }
+}
+
+void Live555VideoSource::StopStream_Impl() {
+  if (pRtspClient_) {
+    shutdownStream(pRtspClient_.release());
+  }
+  if (pEnv_) {
+    pEnv_->reclaim();
   }
 }
 

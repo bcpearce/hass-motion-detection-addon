@@ -47,7 +47,6 @@ TEST_P(TestThreadedHassHandler, CanPostEntityUpdate) {
 }
 
 TEST_P(TestThreadedHassHandler, FailsWithoutBearerToken) {
-  const int startApiCalls = SimServer::GetHassApiCount();
   EXPECT_THROW(std::invoke([entityId = std::string(GetParam())] {
                  auto binarySensor =
                      std::make_unique<callback::ThreadedHassHandler>(
