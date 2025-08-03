@@ -22,6 +22,7 @@
 #include "Util/ProgramOptions.h"
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
+#include "VideoSource/RestartWatcher.h"
 #include "VideoSource/VideoSource.h"
 
 using namespace std::string_view_literals;
@@ -38,59 +39,13 @@ struct ExitSignalHandler {
   }
 };
 
-struct RestartWatcher {
-  std::string sourceDesc;
-  std::weak_ptr<video_source::VideoSource> wpSource;
-  std::weak_ptr<TaskScheduler> wpSched;
-
-  std::chrono::microseconds minInterval{3s};
-  std::chrono::microseconds maxInterval{60s};
-  std::chrono::microseconds interval{minInterval};
-
-  static void CheckAndRestart(void *clientData_restartWatcher) {
-    if (clientData_restartWatcher) {
-      auto &restartWatcher =
-          *static_cast<RestartWatcher *>(clientData_restartWatcher);
-      auto spSource = restartWatcher.wpSource.lock();
-      auto spSched = restartWatcher.wpSched.lock();
-      if (spSource && !spSource->IsActive()) {
-        // attempt to restore
-        LOGGER->info("Video Source {} is down, attempting to restart...",
-                     restartWatcher.sourceDesc);
-        spSource->StartStream();
-        restartWatcher.interval =
-            std::min(restartWatcher.interval * 2, restartWatcher.maxInterval);
-        LOGGER->info("Checking Video Source {} for status in {} seconds",
-                     restartWatcher.sourceDesc,
-                     std::chrono::duration_cast<std::chrono::seconds>(
-                         restartWatcher.interval)
-                         .count());
-      } else {
-        restartWatcher.interval = restartWatcher.minInterval;
-      }
-      if (spSched) {
-        spSched->scheduleDelayedTask(restartWatcher.interval.count(),
-                                     CheckAndRestart,
-                                     clientData_restartWatcher);
-      }
-    }
-  }
-
-  RestartWatcher(std::shared_ptr<video_source::VideoSource> pSource,
-                 std::shared_ptr<TaskScheduler> pSched, std::string sourceDesc)
-      : wpSource{pSource}, wpSched{pSched}, sourceDesc{std::move(sourceDesc)} {
-    if (pSource && pSched) {
-      pSched->scheduleDelayedTask(interval.count(), CheckAndRestart, this);
-    }
-  }
-};
-
 struct SourceAndHandlers {
   std::shared_ptr<video_source::VideoSource> pSource;
   std::shared_ptr<detector::MOGMotionDetector> pDetector;
   std::shared_ptr<callback::BaseHassHandler> pHassHandler;
   std::shared_ptr<callback::AsyncFileSave> pFileSaveHandler;
-  std::unique_ptr<RestartWatcher> pRestartWatcher;
+  std::unique_ptr<video_source::RestartWatcher<callback::BaseHassHandler>>
+      pRestartWatcher;
 };
 
 static ExitSignalHandler exitSignalHandler;
@@ -138,8 +93,9 @@ void App(const util::ProgramOptions &opts) {
     }
     sources.push_back(
         {.pSource = pSource,
-         .pRestartWatcher = std::make_unique<RestartWatcher>(
-             pSource, pSched, std::format("Source-{}", sources.size()))});
+         .pRestartWatcher = std::make_unique<
+             video_source::RestartWatcher<callback::BaseHassHandler>>(
+             std::format("Source-{}", sources.size()), pSource, pSched)});
 
     auto pDetector = std::make_shared<detector::MOGMotionDetector>(
         detector::MOGMotionDetector::Options{.detectionSize =
@@ -193,6 +149,7 @@ void App(const util::ProgramOptions &opts) {
           };
       pDetector->Subscribe(onMotionDetectionCallbackHass);
       sources.back().pHassHandler = pHassHandler;
+      sources.back().pRestartWatcher->wpCallbacks.push_back(pHassHandler);
     }
 
     std::shared_ptr<callback::AsyncFileSave> pFileSaveHandler;

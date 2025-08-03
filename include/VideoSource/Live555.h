@@ -36,6 +36,7 @@ public:
 private:
   void SetYUVFrame(uint8_t **pDataYUV, int width, int height, int strideY,
                    int strideUV, int timestamp);
+  void StopStream_Impl();
 
   unsigned long long maxFrames_{std::numeric_limits<unsigned long long>::max()};
 

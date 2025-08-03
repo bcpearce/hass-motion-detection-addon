@@ -110,7 +110,7 @@ void BasicMotionDetector::ResetModel() {
 cv::Mat BasicMotionDetector::GetModel() { return bgModel_; }
 
 MOGMotionDetector::MOGMotionDetector(Options options) : options{options} {
-  ResetModel();
+  ResetModel_Impl();
 }
 
 std::span<const cv::Rect> MOGMotionDetector::FeedFrame_Impl(cv::Mat frame) {
@@ -129,7 +129,9 @@ std::span<const cv::Rect> MOGMotionDetector::FeedFrame_Impl(cv::Mat frame) {
   return GetRois();
 }
 
-void MOGMotionDetector::ResetModel() {
+void MOGMotionDetector::ResetModel() { ResetModel_Impl(); }
+
+void MOGMotionDetector::ResetModel_Impl() {
   pBgsegm_ = cv::bgsegm::createBackgroundSubtractorMOG(
       options.history, options.nmixtures, options.backgroundRatio,
       options.noiseSigma);

@@ -66,6 +66,7 @@ public:
 
 private:
   std::span<const cv::Rect> FeedFrame_Impl(cv::Mat frame) override;
+  void ResetModel_Impl();
 
   cv::Ptr<cv::BackgroundSubtractor> pBgsegm_{nullptr};
   cv::Mat monoFrame_;
