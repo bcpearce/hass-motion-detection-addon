@@ -89,7 +89,7 @@ jobs:
       - name: Clang Tidy
         run: |
           curl -O https://raw.githubusercontent.com/llvm/llvm-project/main/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
-          python run-clang-tidy.py -p ./build/Release -export-fixes tidy.yaml
+          python3 run-clang-tidy.py -p ./build/Release -export-fixes tidy.yaml
         if: always()
 
       - name: Pack
