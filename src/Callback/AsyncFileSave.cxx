@@ -131,6 +131,7 @@ void AsyncFileSave::SaveFileAtEndpoint(const std::filesystem::path &_dst) {
 #endif
     pCtx->writeData.dstPath = std::move(dst);
     pCtx->writeData.buf = std::move(spareBuf_);
+    pCtx->writeData.buf.clear();
     pCtx->pHandler = this->weak_from_this();
     pCtx->contextId = contextId;
 

@@ -181,13 +181,13 @@ TEST_F(TestAsyncFileSave, CanSaveSimultaneousImages) {
 
   static constexpr int width{680};
   static constexpr int height{480};
-
-  std::barrier sync(2);
+  static constexpr int shapes{12};
 
   auto url = SimServer::GetBaseUrl();
   url.set_path("/api/getimage");
-  url.set_params(
-      {{"width", std::to_string(width)}, {"height", std::to_string(height)}});
+  url.set_params({{"width", std::to_string(width)},
+                  {"height", std::to_string(height)},
+                  {"shapes", std::to_string(shapes)}});
 
   auto asyncFileSave =
       std::make_shared<callback::AsyncFileSave>(pSched_, downloadDir_, url);
@@ -223,14 +223,28 @@ TEST_F(TestAsyncFileSave, CanSaveSimultaneousImages) {
   EXPECT_EQ(asyncFileSave->GetPendingFileOperations(), 0);
   EXPECT_EQ(asyncFileSave->GetSavedFilePaths().size(), imgLimit);
 
-  cv::Mat readImg;
+  std::vector<cv::Mat> readImgs;
   for (const auto &fs : asyncFileSave->GetSavedFilePaths()) {
-    cv::imread(fs.string(), readImg, cv::IMREAD_UNCHANGED);
-    EXPECT_FALSE(readImg.empty())
+    readImgs.push_back(cv::imread(fs.string(), cv::IMREAD_UNCHANGED));
+    EXPECT_FALSE(readImgs.back().empty())
         << "Could not read downloaded image back at " << fs.string();
-    EXPECT_EQ(readImg.cols, width);
-    EXPECT_EQ(readImg.rows, height);
-    EXPECT_EQ(readImg.channels(), 3);
+    EXPECT_EQ(readImgs.back().cols, width);
+    EXPECT_EQ(readImgs.back().rows, height);
+    EXPECT_EQ(readImgs.back().channels(), 3);
+  }
+
+  for (size_t i = 0; i < readImgs.size(); ++i) {
+    for (size_t j = i + 1; j < readImgs.size(); ++j) {
+      thread_local cv::Mat diff;
+      cv::absdiff(readImgs[i], readImgs[j], diff);
+      thread_local std::vector<cv::Mat> diffChannels;
+      cv::split(diff, diffChannels);
+      for (const auto &dc : diffChannels) {
+        EXPECT_GT(cv::countNonZero(dc), 0)
+            << "Images " << i << " and " << j
+            << " are identical, this should not happen with random images";
+      }
+    }
   }
 }
 
@@ -238,8 +252,6 @@ TEST_F(TestAsyncFileSave, CanSaveALargeImage) {
   static constexpr int width{3840};
   static constexpr int height{2160};
   static constexpr int shapes{1200};
-
-  std::barrier sync(2);
 
   auto url = SimServer::GetBaseUrl();
   url.set_path("/api/getimage");

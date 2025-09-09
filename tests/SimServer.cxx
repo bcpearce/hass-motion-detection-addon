@@ -25,6 +25,8 @@ static boost::url url;
 static std::jthread listenerThread;
 static std::atomic_int hassApiCalls_{0};
 
+static std::atomic_int seed{1};
+
 } // namespace
 
 // HTTP server event handler function
@@ -54,6 +56,7 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
 
       // Draw some random shapes
       std::mt19937 rng(std::random_device{}());
+      rng.seed(seed++);
       std::uniform_int_distribution<int> distX(0, width);
       std::uniform_int_distribution<int> distY(0, height);
       std::uniform_int_distribution<int> color(0, 255);
