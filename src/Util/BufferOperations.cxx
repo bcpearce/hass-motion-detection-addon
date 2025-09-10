@@ -17,6 +17,10 @@ size_t FillBufferCallback(char *contents, size_t sz, size_t nmemb,
     size_t realsize = sz * nmemb;
     const auto contentSpan = std::span(contents, realsize);
     buf.insert(buf.end(), contentSpan.begin(), contentSpan.end());
+    /*
+    buf.resize(buf.size() + realsize);
+    std::copy(contentSpan.begin(), contentSpan.end(), buf.end() - realsize);
+    */
     return realsize;
   }
   return 0;

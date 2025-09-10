@@ -52,6 +52,8 @@ window.addEventListener("load", (event) => {
         });
       });
 
+  document.getElementById("go-home").href = `/?feedId=${feed}`;
+
   const insertPageLinks = (links) => {
     const pageCount = Math.ceil(links.length / imgsPerPage);
     const pageList = document.getElementById("page-list");
@@ -76,7 +78,7 @@ window.addEventListener("load", (event) => {
     for (let i = 1; i <= pageCount; i++) {
       const pageElement = document.createElement("li");
       const linkElement = document.createElement("a");
-      linkElement.href = `?page=${i}&imgsPerPage=${imgsPerPage}`;
+      linkElement.href = `?page=${i}&imgsPerPage=${imgsPerPage}&feedId=${feed}`;
       if (i == page) {
         linkElement.ariaCurrent =
             "page"; // Set aria-current for the current page
@@ -94,7 +96,8 @@ window.addEventListener("load", (event) => {
     if (pageCount > 1 && page != pageCount) {
       const nextElement = document.createElement("li");
       const linkElement = document.createElement("a");
-      linkElement.href = `?page=${page + 1}&imgsPerPage=${imgsPerPage}`;
+      linkElement.href =
+          `?page=${page + 1}&imgsPerPage=${imgsPerPage}&feedId=${feed}`;
       const span1Element = document.createElement("span");
       span1Element.setAttribute("aria-hidden", "true");
       span1Element.innerHTML =
