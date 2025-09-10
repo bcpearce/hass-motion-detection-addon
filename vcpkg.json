@@ -31,7 +31,8 @@
   "features": {
     "tests": {
       "dependencies": [
-        "gtest"
+        "gtest",
+        "benchmark"
       ],
       "description": "Build tests."
     }

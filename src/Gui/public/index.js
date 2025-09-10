@@ -1,7 +1,7 @@
 window.addEventListener("load", (event) => {
   const queryString = window.location.search;
   const urlParams = new URLSearchParams(queryString);
-  const feedIdParam = urlParams.get("feedId");
+  const feed = urlParams.get("feedId");
 
   var ws = new WebSocket("/websocket");
 
@@ -17,8 +17,8 @@ window.addEventListener("load", (event) => {
     }
   };
 
-  document.getElementById("img-live").src = `/media/live/${feedIdParam}`;
-  document.getElementById("img-model").src = `/media/model/${feedIdParam}`;
+  document.getElementById("img-live").src = `/media/live/${feed}`;
+  document.getElementById("img-model").src = `/media/model/${feed}`;
   document.getElementById("saved-images").href =
-      `/saved_images.html?feedId=${feedIdParam}`;
+      `/saved_images.html?feedId=${feed}`;
 });
