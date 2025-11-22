@@ -28,7 +28,7 @@ if(BUILD_TESTS)
     endif()
     message(STATUS "Enabling code coverage instrumentation")
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} --coverage -O0 -g -fprofile-arcs -ftest-coverage")
+        "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
   endif()
 endif()

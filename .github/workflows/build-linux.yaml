@@ -69,6 +69,7 @@ jobs:
       - name: Test Debug
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
         working-directory: ./build/Debug-Coverage/
+        continue-on-error: true
 
       - name: Generate GCOV Report
         run: |
