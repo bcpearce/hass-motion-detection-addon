@@ -13,6 +13,17 @@ if(BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
 endif()
 
+option(INSTRUMENT_COVERAGE "Instrument compilation for code coverage" OFF)
+if(INSTRUMENT_COVERAGE)
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(
+      FATAL_ERROR "Code coverage instrumentation requires Debug build type")
+  endif()
+  message(STATUS "Enabling code coverage instrumentation")
+  add_compile_options(--coverage -O0)
+  add_link_options(--coverage)
+endif()
+
 if(WIN32)
   add_compile_definitions("_WIN32_WINNT=0x0601" "_HAS_CXX17=1") # Windows 7
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
