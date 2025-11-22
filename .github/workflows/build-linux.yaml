@@ -70,16 +70,18 @@ jobs:
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
         working-directory: ./build/Debug-Coverage/
 
-      - name: Prepare Python for Coverage Upload
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-        continue-on-error: true
-      - name: Upload Coverage to Coveralls
+      - name: Generate GCOV Report
         run: |
-            python -m pip install --upgrade pip
-            python -m pip install cpp-coveralls==0.4.2
-            coveralls --exclude tests/  --root . --build-root ./build/Debug-Coverage/ --gcov-options '\-lp'
+          apt-get update && apt-get install gcovr -y
+          gcovr --root ../.. --lcov -o lcov.info
+        working-directory: ./build/Debug-Coverage/
+        continue-on-error: true
+
+      - name: Upload GCOV Report to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./build/Debug-Coverage/lcov.info
         continue-on-error: true
 
       - name: Generate and Configure Release
