@@ -25,6 +25,13 @@
         "CMAKE_BUILD_TYPE": "Debug"
       },
       "inherits": "vcpkg"
+    },
+    {
+      "name": "Debug-Coverage",
+      "cacheVariables": {
+        "INSTRUMENT_COVERAGE": true
+      },
+      "inherits": "Debug"
     }
   ],
   "version": 8

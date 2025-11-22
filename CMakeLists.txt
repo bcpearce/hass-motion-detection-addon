@@ -5,12 +5,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
 
+if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Enabling AddressSanitizer for GCC")
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
+  endif()
+endif()
+
 include_directories(AFTER "${CMAKE_BINARY_DIR}/include")
 
 option(BUILD_TESTS "Build Tests" ON)
 if(BUILD_TESTS)
   add_compile_definitions(BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
+  option(INSTRUMENT_COVERAGE "Instrument compilation for code coverage" OFF)
+
+  if(INSTRUMENT_COVERAGE)
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+      message(
+        FATAL_ERROR "Code coverage instrumentation requires Debug build type")
+    endif()
+    message(STATUS "Enabling code coverage instrumentation")
+    set(CMAKE_CXX_FLAGS
+        "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+  endif()
 endif()
 
 if(WIN32)
@@ -72,14 +92,6 @@ target_link_libraries(
 if(WIN32)
   target_link_libraries(Util PUBLIC ws2_32 mswsock)
   target_link_libraries(VideoSource PUBLIC ws2_32 mswsock)
-endif()
-
-if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(STATUS "Enabling AddressSanitizer for GCC")
-    add_compile_options(-fsanitize=address)
-    add_link_options(-fsanitize=address)
-  endif()
 endif()
 
 if(BUILD_TESTS)

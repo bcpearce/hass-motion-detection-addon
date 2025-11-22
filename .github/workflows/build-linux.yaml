@@ -60,15 +60,30 @@ jobs:
             setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
-      - name: Generate and Configure Debug
-        run: cmake . --preset=Debug -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+      - name: Generate and Configure Debug-Coverage
+        run: cmake . --preset=Debug-Coverage -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build Debug
-        run: cmake --build build/Debug
+      - name: Build Debug-Coverage
+        run: cmake --build build/Debug-Coverage
 
       - name: Test Debug
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
-        working-directory: ./build/Debug/
+        working-directory: ./build/Debug-Coverage/
+        continue-on-error: true
+
+      - name: Generate GCOV Report
+        run: |
+          apt-get update && apt-get install gcovr -y
+          gcovr --root ../.. --lcov -o lcov.info
+        working-directory: ./build/Debug-Coverage/
+        continue-on-error: true
+
+      - name: Upload GCOV Report to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./build/Debug-Coverage/lcov.info
+        continue-on-error: true
 
       - name: Generate and Configure Release
         run: cmake . --preset=Release -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
