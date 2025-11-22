@@ -2,6 +2,8 @@
 
 <img src="resources/motion-sensor.svg" width="50" alt="svgwalking"> <img src="resources/motion-sensor-off.svg" width="50" alt="svgwalking">
 
+[Coverage Status](https://coveralls.io/repos/github/bcpearce/hass-motion-detection-addon/badge.svg?branch=code-coverage)](https://coveralls.io/github/bcpearce/hass-motion-detection-addon?branch=code-coverage)
+
 ---
 
 Add-On for Home Assistant that provides motion detection capabilities using various cameras and sensors.
