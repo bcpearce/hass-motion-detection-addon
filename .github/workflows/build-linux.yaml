@@ -74,10 +74,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+        continue-on-error: true
       - name: Upload Coverage to Coveralls
         run: |
             python -m pip install --user cpp-coveralls==0.4.2
-            coveralls --exclude tests/ --exclude external/ --root . --build-root ./build/Debug-Coverage/ --gcov-options '\-lp' || echo "Coverage upload failed"
+            coveralls --exclude tests/  --root . --build-root ./build/Debug-Coverage/ --gcov-options '\-lp'
+        continue-on-error: true
 
       - name: Generate and Configure Release
         run: cmake . --preset=Release -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
