@@ -40,18 +40,3 @@ gtest_discover_tests(${TEST_PROJECT})
 
 add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
 add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)
-
-if(INSTRUMENT_COVERAGE)
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(
-      FATAL_ERROR "Code coverage instrumentation requires Debug build type")
-  endif()
-  if(NOT CMAKE_COMPILER_IS_GNUCC)
-    message(
-      FATAL_ERROR "Code coverage instrumentation is only supported with GCC")
-  endif()
-  message(STATUS "Enabling code coverage instrumentation")
-  set(CMAKE_CXX_FLAGS
-      "${CMAKE_CXX_FLAGS} --coverage -O0 -g -fprofile-arcs -ftest-coverage")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-endif()

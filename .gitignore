@@ -9,3 +9,4 @@ out/
 .vs/
 /install
 Testing/
+node_modules/
