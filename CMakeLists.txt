@@ -11,17 +11,7 @@ option(BUILD_TESTS "Build Tests" ON)
 if(BUILD_TESTS)
   add_compile_definitions(BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
-endif()
-
-option(INSTRUMENT_COVERAGE "Instrument compilation for code coverage" OFF)
-if(INSTRUMENT_COVERAGE)
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(
-      FATAL_ERROR "Code coverage instrumentation requires Debug build type")
-  endif()
-  message(STATUS "Enabling code coverage instrumentation")
-  add_compile_options(--coverage -O0)
-  add_link_options(--coverage)
+  option(INSTRUMENT_COVERAGE "Instrument compilation for code coverage" OFF)
 endif()
 
 if(WIN32)

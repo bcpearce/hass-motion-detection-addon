@@ -27,7 +27,7 @@
       "inherits": "vcpkg"
     },
     {
-      "name": "Test",
+      "name": "Debug-Coverage",
       "cacheVariables": {
         "INSTRUMENT_COVERAGE": true
       },
