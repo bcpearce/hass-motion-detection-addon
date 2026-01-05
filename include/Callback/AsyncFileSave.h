@@ -127,9 +127,10 @@ private:
 #endif //  __linux__
 
 #if _WIN32
-  static VOID CALLBACK FileIOCompletionRoutine(
-      __in DWORD dwErrorCode, __in DWORD dwNumberOfBytesTransferred,
-      __in LPOVERLAPPED lpOverlapped);
+  static VOID
+      CALLBACK FileIOCompletionRoutine(__in DWORD dwErrorCode,
+                                       __in DWORD dwNumberOfBytesTransferred,
+                                       __in LPOVERLAPPED lpOverlapped);
 #endif
 
   static void RemoveContext(_CurlEasyContext *pCtx);
