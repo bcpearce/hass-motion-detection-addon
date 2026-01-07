@@ -113,23 +113,43 @@ TEST_F(WebHandlerTests, LoadAndReadBackFeedIds) {
 }
 
 TEST_F(WebHandlerTests, LoadFeed) {
-  static constexpr auto feedId{"feed1"sv};
-  (*pWh_)({.feedId = feedId});
+  (*pWh_)({.feedId = "feed1"sv});
   util::CurlWrapper wCurl;
   std::vector<char> headerBuf;
+
+  for (const auto feed : {"feed1"sv, "feedunknown"sv}) {
+    for (const auto slug : {"live"sv, "model"sv}) {
+      EXPECT_NO_THROW(std::invoke([&] {
+        const auto url =
+            std::format("{}/media/{}/{}", GetServerUrl(), slug, feed);
+        wCurl(curl_easy_setopt, CURLOPT_URL, url.c_str());
+        wCurl(curl_easy_setopt, CURLOPT_NOBODY, 1);
+        wCurl(curl_easy_perform);
+      }));
+
+      curl_header *hdr;
+      curl_easy_header(&wCurl, "Cache-Control", 0, CURLH_HEADER, -1, &hdr);
+      EXPECT_THAT(hdr->value, testing::HasSubstr("no-cache"sv));
+      curl_easy_header(&wCurl, "Content-Type", 0, CURLH_HEADER, -1, &hdr);
+      EXPECT_THAT(hdr->value, testing::HasSubstr("multipart"sv));
+      EXPECT_THAT(hdr->value, testing::HasSubstr("boundary"sv));
+    }
+  }
+}
+
+TEST_F(WebHandlerTests, FailToGetSavedMedia) {
+  std::vector<char> buf;
+  util::CurlWrapper wCurl;
   EXPECT_NO_THROW(std::invoke([&] {
-    const auto url = std::format("{}/media/live/{}", GetServerUrl(), feedId);
+    const auto url = GetServerUrl() + "/media/saved/noMedia"s;
     wCurl(curl_easy_setopt, CURLOPT_URL, url.c_str());
-    wCurl(curl_easy_setopt, CURLOPT_NOBODY, 1);
+    wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
+    wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
     wCurl(curl_easy_perform);
   }));
-
-  curl_header *hdr;
-  curl_easy_header(&wCurl, "Cache-Control", 0, CURLH_HEADER, -1, &hdr);
-  EXPECT_THAT(hdr->value, testing::HasSubstr("no-cache"sv));
-  curl_easy_header(&wCurl, "Content-Type", 0, CURLH_HEADER, -1, &hdr);
-  EXPECT_THAT(hdr->value, testing::HasSubstr("multipart"sv));
-  EXPECT_THAT(hdr->value, testing::HasSubstr("boundary"sv));
+  int code{0};
+  wCurl(curl_easy_getinfo, CURLINFO_HTTP_CODE, &code);
+  EXPECT_EQ(404, code);
 }
 
 INSTANTIATE_TEST_SUITE_P(ImageTypes, WebHandlerTests,

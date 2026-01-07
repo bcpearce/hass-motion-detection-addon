@@ -162,11 +162,7 @@ void WebHandler::EventHandler(mg_connection *c, int ev, void *ev_data) {
   } break;
   }
 }
-/// <summary>
-///
-/// </summary>
-/// <param name="slug"></param>
-/// <param name="_savedFilesPath"></param>
+
 void WebHandler::SetSavedFilesServePath(
     std::string_view slug, const std::filesystem::path &_savedFilesPath) {
   savedFilesPath[slug] = _savedFilesPath;
