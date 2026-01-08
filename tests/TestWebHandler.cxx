@@ -39,7 +39,9 @@ protected:
 
   void TearDown() override { pWh_->Stop(); }
 
-  std::string GetServerUrl() const { return "http://localhost:32836"s; }
+  std::string GetServerUrl() const {
+    return {pWh_->GetUrl().data(), pWh_->GetUrl().size()};
+  }
 
   std::unique_ptr<gui::WebHandler> pWh_;
 };
