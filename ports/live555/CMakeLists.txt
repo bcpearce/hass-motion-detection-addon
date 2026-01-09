@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(live555 C CXX)
 
+option(ENABLE_TEST_PROGS "Build test programs" OFF)
+
 set(CMAKE_CXX_STANDARD 20)
 include_directories(BasicUsageEnvironment/include groupsock/include
                     liveMedia/include UsageEnvironment/include)
@@ -37,6 +39,7 @@ target_include_directories(
   liveMedia
   PRIVATE "${OPENSSL_INCLUDE_DIR}"
   PUBLIC $<INSTALL_INTERFACE:include>)
+target_link_libraries(liveMedia PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
 file(GLOB USAGE_ENVIRONMENT_SRCS UsageEnvironment/*.c UsageEnvironment/*.cpp)
 add_library(UsageEnvironment ${USAGE_ENVIRONMENT_SRCS})
@@ -52,11 +55,29 @@ find_dependency(OpenSSL)
 include("${CMAKE_CURRENT_LIST_DIR}/live555.cmake")
 ]])
 
+set(LIVE555_LIB_TARGETS liveMedia groupsock BasicUsageEnvironment  UsageEnvironment)
+set(INSTALL_TARGETS ${LIVE555_LIB_TARGETS})
+if (ENABLE_TEST_PROGS)
+  add_executable(testOnDemandRTSPServer testProgs/testOnDemandRTSPServer.cpp testProgs/announceURL.cpp)
+  target_link_libraries(testOnDemandRTSPServer PRIVATE ${LIVE555_LIB_TARGETS})
+  if(WIN32)
+      target_link_libraries(testOnDemandRTSPServer PRIVATE ws2_32)
+  endif()
+
+  add_executable(testRTSPClient testProgs/testRTSPClient.cpp)
+  target_link_libraries(testRTSPClient PRIVATE ${LIVE555_LIB_TARGETS})
+  if(WIN32)
+      target_link_libraries(testRTSPClient PRIVATE ws2_32)
+  endif()
+
+  list(APPEND INSTALL_TARGETS testOnDemandRTSPServer testRTSPClient)
+endif()
+
 install(FILES "${CMAKE_BINARY_DIR}/live555-config.cmake"
         DESTINATION share/live555)
 
 install(
-  TARGETS groupsock BasicUsageEnvironment liveMedia UsageEnvironment
+  TARGETS ${INSTALL_TARGETS}
   EXPORT Live555
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib

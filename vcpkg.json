@@ -4,7 +4,12 @@
     "boost-program-options",
     "boost-url",
     "curl",
-    "live555",
+    {
+      "name": "live555",
+      "features": [
+        "test-progs"
+      ]
+    },
     "ms-gsl",
     {
       "name": "mongoose",
