@@ -3,11 +3,11 @@ index 122ef1d..994d149 100644
 --- a/testProgs/testOnDemandRTSPServer.cpp
 +++ b/testProgs/testOnDemandRTSPServer.cpp
 @@ -22,7 +22,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
- 
+
  #include "BasicUsageEnvironment.hh"
  #include "announceURL.hh"
 -#define SERVER_USE_TLS 1//#####@@@@@
 +// #define SERVER_USE_TLS 1//#####@@@@@
- 
+
  UsageEnvironment* env;
- 
+

@@ -11,17 +11,15 @@ vcpkg_download_distfile(
 )
 
 vcpkg_extract_source_archive(
-  SOURCE_PATH ARCHIVE "${ARCHIVE}"
-  PATCHES fix_testOnDemandRTSPServer.patch
+  SOURCE_PATH ARCHIVE "${ARCHIVE}" PATCHES fix_testOnDemandRTSPServer.patch
   # PATCHES fix-RTSPClient.patch fix_operator_overload.patch
 )
 
 file(COPY "${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt"
      DESTINATION "${SOURCE_PATH}")
 
-vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
-    FEATURES "test-progs" ENABLE_TEST_PROGS
-)
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS FEATURES "test-progs"
+                     ENABLE_TEST_PROGS)
 
 vcpkg_cmake_configure(SOURCE_PATH "${SOURCE_PATH}" OPTIONS ${FEATURE_OPTIONS})
 
@@ -29,8 +27,8 @@ vcpkg_cmake_install()
 vcpkg_copy_pdbs()
 
 vcpkg_cmake_config_fixup(PACKAGE_NAME live555)
-if ("test-progs" IN_LIST FEATURES)
-    vcpkg_copy_tools(TOOL_NAMES testOnDemandRTSPServer testRTSPClient)
+if("test-progs" IN_LIST FEATURES)
+  vcpkg_copy_tools(TOOL_NAMES testOnDemandRTSPServer testRTSPClient)
 endif()
 
 file(
@@ -44,6 +42,7 @@ file(
 file(COPY ${HEADERS} DESTINATION "${CURRENT_PACKAGES_DIR}/include")
 
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
-file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/bin" "${CURRENT_PACKAGES_DIR}/bin")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/bin"
+     "${CURRENT_PACKAGES_DIR}/bin")
 
 vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/COPYING")

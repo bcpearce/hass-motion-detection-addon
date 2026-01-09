@@ -55,19 +55,21 @@ find_dependency(OpenSSL)
 include("${CMAKE_CURRENT_LIST_DIR}/live555.cmake")
 ]])
 
-set(LIVE555_LIB_TARGETS liveMedia groupsock BasicUsageEnvironment  UsageEnvironment)
+set(LIVE555_LIB_TARGETS liveMedia groupsock BasicUsageEnvironment
+                        UsageEnvironment)
 set(INSTALL_TARGETS ${LIVE555_LIB_TARGETS})
-if (ENABLE_TEST_PROGS)
-  add_executable(testOnDemandRTSPServer testProgs/testOnDemandRTSPServer.cpp testProgs/announceURL.cpp)
+if(ENABLE_TEST_PROGS)
+  add_executable(testOnDemandRTSPServer testProgs/testOnDemandRTSPServer.cpp
+                                        testProgs/announceURL.cpp)
   target_link_libraries(testOnDemandRTSPServer PRIVATE ${LIVE555_LIB_TARGETS})
   if(WIN32)
-      target_link_libraries(testOnDemandRTSPServer PRIVATE ws2_32)
+    target_link_libraries(testOnDemandRTSPServer PRIVATE ws2_32)
   endif()
 
   add_executable(testRTSPClient testProgs/testRTSPClient.cpp)
   target_link_libraries(testRTSPClient PRIVATE ${LIVE555_LIB_TARGETS})
   if(WIN32)
-      target_link_libraries(testRTSPClient PRIVATE ws2_32)
+    target_link_libraries(testRTSPClient PRIVATE ws2_32)
   endif()
 
   list(APPEND INSTALL_TARGETS testOnDemandRTSPServer testRTSPClient)

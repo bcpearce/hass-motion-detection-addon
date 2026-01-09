@@ -39,10 +39,7 @@ target_compile_definitions(${UNIT_TEST_PROJECT}
 include(GoogleTest)
 gtest_discover_tests(${UNIT_TEST_PROJECT})
 
-add_executable(
-  TestLive555_Integraton
-  TestLive555_Integration.cxx
-  LogEnv.h)
+add_executable(TestLive555_Integraton TestLive555_Integration.cxx LogEnv.h)
 target_link_libraries(
   TestLive555_Integraton
   PRIVATE Callback
@@ -55,14 +52,12 @@ target_link_libraries(
           GTest::gtest)
 
 set(TEST_FILE_URL "http://www.live555.com/liveMedia/public/264/test.264")
-add_test(NAME TestLive555_Integration 
-  COMMAND 
-    python3 
-    "${CMAKE_SOURCE_DIR}/tests/TestLive555_Integration.py"
-    "${TEST_FILE_URL}"
-    $<TARGET_FILE:Live555::testOnDemandRTSPServer> 
-    $<TARGET_FILE:TestLive555_Integraton>
-  )
+add_test(
+  NAME TestLive555_Integration
+  COMMAND
+    python3 "${CMAKE_SOURCE_DIR}/tests/TestLive555_Integration.py"
+    "${TEST_FILE_URL}" $<TARGET_FILE:Live555::testOnDemandRTSPServer>
+    $<TARGET_FILE:TestLive555_Integraton>)
 
 add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
 add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)
