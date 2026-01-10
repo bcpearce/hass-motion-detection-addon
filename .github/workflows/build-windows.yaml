@@ -61,8 +61,9 @@ jobs:
         run: cmake --build build/Debug
 
       - name: Test Debug
-        run: ctest --output-junit test_detail_debug.xml --output-on-failure
-        working-directory: ./build/Debug
+        run: |
+          cd build/Debug
+          ctest --output-junit test_detail_debug.xml --output-on-failure
 
       - name: Generate and Configure Release
         run: cmake . \
@@ -75,8 +76,9 @@ jobs:
         run: cmake --build build/Release
 
       - name: Test Release
-        run: ctest --output-junit test_detail_release.xml --output-on-failure
-        working-directory: ./build/Release
+        run: |
+          cd build/Release
+          ctest --output-junit test_detail_release.xml --output-on-failure
 
       - name: Test Summary
         uses: test-summary/action@v2
