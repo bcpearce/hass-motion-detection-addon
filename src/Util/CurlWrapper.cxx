@@ -1,10 +1,35 @@
+#if defined(_DEBUG)
+#include "Logger.h"
+#include <ranges>
+#endif
+
 #include "Util/CurlWrapper.h"
 
 #include <mutex>
 
 namespace {
 static std::once_flag curlGlobalFlag;
+
+#if defined(_DEBUG)
+int curlDebugCallback(CURL *handle, curl_infotype type, char *data, size_t sz,
+                      void *) {
+  switch (type) {
+  case CURLINFO_TEXT: {
+    const std::string_view log(data, sz);
+    for (const auto &lv : log | std::views::split('\n')) {
+      std::string_view line(lv.begin(), lv.end());
+      line = line.substr(0, line.find_last_not_of("\r\n"));
+      if (!line.empty()) {
+        LOGGER->debug("{} ", line);
+      }
+    }
+  } break;
+  }
+  return 0;
 }
+#endif
+
+} // namespace
 
 namespace util {
 
@@ -15,6 +40,7 @@ CurlWrapper::CurlWrapper() noexcept {
   curl_easy_setopt(pCurl_, CURLOPT_ERRORBUFFER, errBuf_.data());
 #if defined(_DEBUG)
   curl_easy_setopt(pCurl_, CURLOPT_VERBOSE, 1);
+  curl_easy_setopt(pCurl_, CURLOPT_DEBUGFUNCTION, curlDebugCallback);
 #endif
 }
 
