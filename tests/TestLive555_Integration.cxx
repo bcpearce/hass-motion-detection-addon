@@ -55,8 +55,8 @@ public:
       return;
     }
     std::filesystem::remove(resourcePath_);
-    pResourceFile_ = fopen(resourcePath_.c_str(), "wb");
-    pShaFile_ = fopen(shaPath_.c_str(), "w");
+    pResourceFile_ = fopen(resourcePath_.string().c_str(), "wb");
+    pShaFile_ = fopen(shaPath_.string().c_str(), "w");
     if (pResourceFile_) {
       const std::vector<char> buf = std::invoke([] {
         util::CurlWrapper wCurl;
