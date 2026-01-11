@@ -39,7 +39,7 @@ target_include_directories(
   liveMedia
   PRIVATE "${OPENSSL_INCLUDE_DIR}"
   PUBLIC $<INSTALL_INTERFACE:include>)
-target_link_libraries(liveMedia PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(liveMedia PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 
 file(GLOB USAGE_ENVIRONMENT_SRCS UsageEnvironment/*.c UsageEnvironment/*.cpp)
 add_library(UsageEnvironment ${USAGE_ENVIRONMENT_SRCS})
