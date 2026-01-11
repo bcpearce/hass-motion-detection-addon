@@ -54,17 +54,19 @@ target_link_libraries(
           VideoSource
           GTest::gtest)
 
-set(TEST_FILE_URL "http://www.live555.com/liveMedia/public/264/test.264")
-# add_test( NAME TestLive555_Integration COMMAND python3
-# "${CMAKE_SOURCE_DIR}/tests/TestLive555_Integration.py" "${TEST_FILE_URL}"
-# $<TARGET_FILE:Live555::testOnDemandRTSPServer>
-# $<TARGET_FILE:TestLive555_Integraton>)
 add_test(
-  NAME TestLive555_Integration
+  NAME TestLive555_Integration.H264
   COMMAND
     $<TARGET_FILE:TestLive555_Integration> --duration=3
-    --resourceUrl=${TEST_FILE_URL} --resourceUrl=${TEST_FILE_URL}
+    --resourceUrl=http://www.live555.com/liveMedia/public/264/test.264
     --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>)
+add_test(
+  NAME TestLive555_Integration.H265
+  COMMAND
+    $<TARGET_FILE:TestLive555_Integration> --duration=3
+    --resourceUrl=http://www.live555.com/liveMedia/public/265/surfing.265
+    --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>)
+set_tests_properties(TestLive555_Integration.H265 PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
 add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)

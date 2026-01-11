@@ -7,6 +7,7 @@
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
 #include <BasicUsageEnvironment.hh>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/asio.hpp>
 #include <boost/bind/bind.hpp>
@@ -19,6 +20,7 @@
 #include "LogEnv.h"
 
 using namespace std::chrono_literals;
+using namespace std::string_literals;
 namespace bp2 = boost::process::v2;
 namespace asio = boost::asio;
 
@@ -36,7 +38,17 @@ void StopStream(void *clientData) {
 
 class Live555VideoSourceTests : public testing::Test {
 public:
-  Live555VideoSourceTests() : stderrCap_{ioCtx_} {}
+  Live555VideoSourceTests() : stderrCap_{ioCtx_} {
+    std::vector<std::string> splits;
+    boost::split(splits, args.resourceUrl.c_str(), boost::is_any_of("/"));
+    resourcePath_ = splits.back();
+    boost::split(splits, resourcePath_.string(), boost::is_any_of("."));
+    if (splits.front() != "test"s) {
+      resourcePath_ = std::format("test.{}", splits.back());
+    }
+    shaPath_ = std::format("{}.sha.txt", splits.back());
+  }
+
   void SetUp() override {
     if (std::filesystem::exists(resourcePath_)) {
       LOGGER->info("Resource at {} already exists", resourcePath_.string());
@@ -86,7 +98,7 @@ public:
     if (pShaFile_) {
       fclose(pShaFile_);
     }
-    // std::filesystem::remove(resourcePath_);
+    std::filesystem::remove(resourcePath_);
   }
 
 protected:
@@ -122,8 +134,8 @@ protected:
   }
   FILE *pResourceFile_{nullptr};
   FILE *pShaFile_{nullptr};
-  std::filesystem::path resourcePath_{"test.264"};
-  std::filesystem::path shaPath_{"test.264.sha.txt"};
+  std::filesystem::path resourcePath_;
+  std::filesystem::path shaPath_;
 
   asio::io_context ioCtx_;
   asio::streambuf streamBuf_;
