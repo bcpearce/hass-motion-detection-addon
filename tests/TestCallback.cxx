@@ -1,3 +1,4 @@
+#include "Logger.h"
 #include <gtest/gtest.h>
 
 #include "Callback/AsyncFileSave.h"
@@ -258,6 +259,7 @@ TEST_F(TestAsyncFileSave, CanSaveALargeImage) {
   url.set_params({{"width", std::to_string(width)},
                   {"height", std::to_string(height)},
                   {"shapes", std::to_string(shapes)}});
+  LOGGER->debug("Connecting to resource {}", url.c_str());
 
   auto asyncFileSave =
       std::make_shared<callback::AsyncFileSave>(pSched_, downloadDir_, url);

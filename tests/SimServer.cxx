@@ -1,4 +1,5 @@
 #include "SimServer.h"
+#include "Logger.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -142,6 +143,16 @@ SimServer::SimServer(Token, int port) {
   url.set_port(std::to_string(port));
 }
 
+static void redirectLog(char c, void *) {
+  static std::string buf;
+  if (c == '\n') {
+    LOGGER->debug("[SIM SERVER] {}", buf);
+    buf.clear();
+  } else {
+    buf.push_back(c);
+  }
+}
+
 void SimServer::Start(int port) noexcept {
   if (!pServer || url.port_number() != port) {
     pServer = std::make_unique<SimServer>(Token(), port);
@@ -151,12 +162,24 @@ void SimServer::Start(int port) noexcept {
     struct mg_mgr mgr;
 #ifdef _DEBUG
     mg_log_set(MG_LL_DEBUG);
+    mg_log_set_fn(redirectLog, nullptr);
 #endif
     mg_mgr_init(&mgr);
-    mg_http_listen(&mgr, url.c_str(), ev_handler, nullptr);
-    sync.arrive_and_drop();
-    while (!stopToken.stop_requested()) {
-      mg_mgr_poll(&mgr, 1000);
+    mg_connection *c = mg_http_listen(&mgr, url.c_str(), ev_handler, nullptr);
+    if (c) {
+      if (url.port_number() == 0) {
+        // Retrieve  the auto-set port
+        url.set_port(std::to_string(c->loc.port));
+        LOGGER->info("[SIM SERVER] port auto-set to {}", url.port());
+      }
+      sync.arrive_and_drop();
+      while (!stopToken.stop_requested()) {
+        mg_mgr_poll(&mgr, 1000);
+      }
+    } else {
+      sync.arrive_and_drop();
+      LOGGER->error("[SIM SERVER] failed to start server on port {}",
+                    url.port());
     }
     mg_mgr_free(&mgr);
   });

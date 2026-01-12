@@ -30,14 +30,20 @@ target_link_libraries(
           unofficial::mongoose::mongoose
           Util
           VideoSource
+          Boost::process
           GTest::gtest)
 
-set(SIM_SERVER_PORT "25689")
+set(SIM_SERVER_PORT_START "25689")
 target_compile_definitions(${UNIT_TEST_PROJECT}
-                           PRIVATE SIM_SERVER_PORT=${SIM_SERVER_PORT})
+                           PRIVATE SIM_SERVER_PORT=${SIM_SERVER_PORT_START})
 
 include(GoogleTest)
-gtest_discover_tests(${UNIT_TEST_PROJECT})
+gtest_discover_tests(${UNIT_TEST_PROJECT} TEST_LIST UNIT_TESTS)
+set_property(
+  DIRECTORY
+  APPEND
+  PROPERTY TEST_INCLUDE_FILES
+           ${CMAKE_CURRENT_SOURCE_DIR}/UniquePortTestManip.cmake)
 
 add_executable(TestLive555_Integration TestLive555_Integration.cxx LogEnv.h)
 find_package(Boost REQUIRED COMPONENTS asio process)
@@ -54,19 +60,16 @@ target_link_libraries(
           VideoSource
           GTest::gtest)
 
+add_custom_command(
+  TARGET TestLive555_Integration
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/res/test.264"
+          "$<TARGET_FILE_DIR:TestLive555_Integration>/test.264"
+  COMMENT "Copying Live555 Integration test data")
 add_test(
   NAME TestLive555_Integration.H264
-  COMMAND
-    $<TARGET_FILE:TestLive555_Integration> --duration=3
-    --resourceUrl=http://www.live555.com/liveMedia/public/264/test.264
-    --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>)
-add_test(
-  NAME TestLive555_Integration.H265
-  COMMAND
-    $<TARGET_FILE:TestLive555_Integration> --duration=3
-    --resourceUrl=http://www.live555.com/liveMedia/public/265/surfing.265
-    --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>)
-set_tests_properties(TestLive555_Integration.H265 PROPERTIES WILL_FAIL TRUE)
+  COMMAND $<TARGET_FILE:TestLive555_Integration> --duration=3
+          --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>)
 
 add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
 add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)

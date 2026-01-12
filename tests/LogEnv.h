@@ -1,5 +1,6 @@
 #pragma once
 #include "Logger.h"
+#include <gtest/gtest.h>
 
 class LoggerEnvironment : public ::testing::Environment {
 public:
