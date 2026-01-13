@@ -63,9 +63,8 @@ add_custom_command(
   COMMENT "Copying Live555 Integration test data")
 add_test(
   NAME TestLive555_Integration.H264
-  COMMAND $<TARGET_FILE:TestLive555_Integration> --duration=3
-          --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>
-  WORKING_DIRECTORY "$<TARGET_FILE_DIR:TestLive555_Integration>")
+  COMMAND $<TARGET_FILE:TestLive555_Integration> --duration=10
+          --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>)
 
 add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
 add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)

@@ -99,8 +99,9 @@ TEST_F(Live555VideoSourceTests, Smoke) {
   ASSERT_TRUE(std::filesystem::is_regular_file(std::filesystem::current_path() /
                                                resourceFile))
       << "Expected to find resource file 'test.264' in working directory";
-  bp2::async_execute(bp2::process(ioCtx_, args.rtspServerExec, {},
-                                  bp2::process_stdio{{}, {}, stderrCap_}))(
+  bp2::async_execute(bp2::process(
+      ioCtx_, args.rtspServerExec, {}, bp2::process_stdio{{}, {}, stderrCap_},
+      bp2::process_start_dir{std::filesystem::current_path()}))(
       asio::cancel_after(args.duration, asio::cancellation_type::partial))(
       asio::cancel_after(args.duration, asio::cancellation_type::terminal))(
       asio::detached);
@@ -154,8 +155,12 @@ TEST_F(Live555VideoSourceTests, Smoke) {
   ioCtx_.run();
   EXPECT_GT(pSource->GetFrameCount(), 0);
   EXPECT_TRUE(spCallback->didUpdateListener);
-  EXPECT_GT(watcher.GetNullPayloadUpdates(), 0);
   EXPECT_GT(watcher.GetRestartAttempts(), 0);
+  EXPECT_GT(watcher.GetNullPayloadUpdates(), 0);
+
+  RecordProperty("Frame Count", pSource->GetFrameCount());
+  RecordProperty("Restart Attempts", watcher.GetRestartAttempts());
+  RecordProperty("Null Payload Updates", watcher.GetNullPayloadUpdates());
 }
 
 int main(int argc, char **argv) {
