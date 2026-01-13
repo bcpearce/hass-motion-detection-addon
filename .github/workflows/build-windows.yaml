@@ -61,7 +61,7 @@ jobs:
         run: cmake --build build/Debug
 
       - name: Test Debug
-        working-directory: build/Debug-Coverage
+        working-directory: build/Debug
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
 
       - name: Generate and Configure Release
