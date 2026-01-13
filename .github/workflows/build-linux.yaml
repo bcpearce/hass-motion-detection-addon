@@ -9,11 +9,6 @@ on:
   pull_request:
 
 env:
-  USERNAME: bcpearce
-  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-  VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-  VCPKG_GIT_REF: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
-  FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
   DOCKER_REGISTRY_IMAGE: "bcpearce/hass-motion-detection-addon"
 
@@ -37,30 +32,12 @@ jobs:
         with:
           submodules: true
 
-      - name: Get VCPKG
-        run: |
-            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
-
-      - name: Bootstrap vcpkg
-        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
-
-      - name: Add NuGet sources
-        env:
-          VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-          USERNAME: bcpearce
-          FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
-        run: |
-          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            sources add \
-            -Source "${{ env.FEED_URL }}" \
-            -StorePasswordInClearText \
-            -Name GitHubPackages \
-            -UserName "${{ env.USERNAME }}" \
-            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
-            -Source "${{ env.FEED_URL }}"
+      - uses: ./.github/actions/vcpkg-cache
+        with:
+          username: bcpearce
+          password: ${{ secrets.GH_PACKAGES_TOKEN }}
+          vcpkg-git-ref: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
+          feed-url: https://nuget.pkg.github.com/bcpearce/index.json
 
       - name: Generate and Configure Debug-Coverage
         run: cmake . --preset=Debug-Coverage -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
@@ -69,9 +46,8 @@ jobs:
         run: cmake --build build/Debug-Coverage
 
       - name: Test Debug
-        run: |
-          cd build/Debug-Coverage
-          ctest --output-junit test_detail_debug.xml --output-on-failure
+        working-directory: build/Debug-Coverage
+        run: ctest --output-junit test_detail_debug.xml --output-on-failure
         continue-on-error: true
 
       - name: Generate GCOV Report
@@ -95,9 +71,8 @@ jobs:
         run: cmake --build build/Release
 
       - name: Test Release
-        run: |
-          cd build/Release
-          ctest --output-junit test_detail_debug.xml --output-on-failure
+        working-directory: build/Release
+        run: ctest --output-junit test_detail_debug.xml --output-on-failure
 
       - name: Test Summary
         uses: test-summary/action@v2

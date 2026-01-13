@@ -1,0 +1,53 @@
+name: VCPKG Cache
+description: Use NuGet on GitHub repository to cache vcpkg builds
+inputs:
+  vcpkg-repo:
+    description: Repo for VCPKG
+    default: https://github.com/microsoft/vcpkg.git
+    required: true
+  username:
+    description: Username for authentication with GitHub
+    required: true
+  password:
+    description: Password for authentication with GitHub
+    required: true
+  feed-url:
+    description: Feed to obtain from NuGet
+    required: true
+  vcpkg-exe:
+    description: VCPKG executable to run
+    default: ${{ github.workspace }}/vcpkg/vcpkg
+  vcpkg-root:
+    description: VCPKG root to clone into
+    default: ${{ github.workspace }}/vcpkg
+  vcpkg-git-ref:
+    description: Pinned ref to VCPKG
+    default: main
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get VCPKG
+      shell: bash
+      run: |
+          git clone https://github.com/microsoft/vcpkg.git ${{ inputs.vcpkg-root }}
+          cd ${{ inputs.vcpkg-root }} && git checkout ${{ inputs.vcpkg-git-ref }}
+
+    - name: Bootstrap vcpkg
+      shell: bash
+      run: ${{ inputs.vcpkg-root }}/bootstrap-vcpkg.sh
+
+    - name: Add NuGet sources
+      shell: bash
+      run: |
+        mono `${{ inputs.vcpkg-exe }} fetch nuget | tail -n 1` \
+          sources add \
+          -Source "${{ inputs.feed-url }}" \
+          -StorePasswordInClearText \
+          -Name GitHubPackages \
+          -UserName "${{ inputs.username }}" \
+          -Password "${{ inputs.password }}"
+        mono `${{ inputs.vcpkg-exe }} fetch nuget | tail -n 1` \
+          setapikey "${{ inputs.password }}" \
+          -Source "${{ inputs.feed-url }}"
