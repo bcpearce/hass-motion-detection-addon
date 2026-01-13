@@ -71,6 +71,7 @@ jobs:
       - name: Test Debug
         run: |
           cd build/Debug-Coverage
+          killall testOnDemandRTSPServer || true
           ctest --output-junit test_detail_debug.xml --output-on-failure
         continue-on-error: true
 
@@ -97,6 +98,7 @@ jobs:
       - name: Test Release
         run: |
           cd build/Release
+          killall testOnDemandRTSPServer || true
           ctest --output-junit test_detail_debug.xml --output-on-failure
 
       - name: Test Summary

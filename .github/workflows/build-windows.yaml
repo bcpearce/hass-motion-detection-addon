@@ -63,6 +63,7 @@ jobs:
       - name: Test Debug
         run: |
           cd build/Debug
+          killall testOnDemandRTSPServer || true
           ctest --output-junit test_detail_debug.xml --output-on-failure -E "^TestLive555_Integration\.*"
 
       - name: Generate and Configure Release
@@ -78,6 +79,7 @@ jobs:
       - name: Test Release
         run: |
           cd build/Release
+          killall testOnDemandRTSPServer || true
           ctest --output-junit test_detail_release.xml --output-on-failure -E "^TestLive555_Integration\.*"
 
       - name: Test Summary

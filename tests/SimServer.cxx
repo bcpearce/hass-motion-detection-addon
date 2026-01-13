@@ -148,7 +148,7 @@ static void redirectLog(char c, void *) {
   if (c == '\n') {
     LOGGER->debug("[SIM SERVER] {}", buf);
     buf.clear();
-  } else {
+  } else if (c != '\r') {
     buf.push_back(c);
   }
 }
@@ -170,8 +170,9 @@ void SimServer::Start(int port) noexcept {
       if (url.port_number() == 0) {
         // Retrieve  the auto-set port
         url.set_port(std::to_string(c->loc.port));
-        LOGGER->info("[SIM SERVER] port auto-set to {}", url.port());
+        LOGGER->info("[SIM SERVER] port selected automatically", url.port());
       }
+      LOGGER->info("[SIM SERVER] port set to {}", url.port());
       sync.arrive_and_drop();
       while (!stopToken.stop_requested()) {
         mg_mgr_poll(&mgr, 1000);

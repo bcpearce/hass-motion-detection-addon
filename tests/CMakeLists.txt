@@ -33,17 +33,12 @@ target_link_libraries(
           Boost::process
           GTest::gtest)
 
-set(SIM_SERVER_PORT_START "25689")
+set(SIM_SERVER_PORT "25689")
 target_compile_definitions(${UNIT_TEST_PROJECT}
-                           PRIVATE SIM_SERVER_PORT=${SIM_SERVER_PORT_START})
+                           PRIVATE SIM_SERVER_PORT=${SIM_SERVER_PORT})
 
 include(GoogleTest)
 gtest_discover_tests(${UNIT_TEST_PROJECT} TEST_LIST UNIT_TESTS)
-set_property(
-  DIRECTORY
-  APPEND
-  PROPERTY TEST_INCLUDE_FILES
-           ${CMAKE_CURRENT_SOURCE_DIR}/UniquePortTestManip.cmake)
 
 add_executable(TestLive555_Integration TestLive555_Integration.cxx LogEnv.h)
 find_package(Boost REQUIRED COMPONENTS asio process)
@@ -69,7 +64,8 @@ add_custom_command(
 add_test(
   NAME TestLive555_Integration.H264
   COMMAND $<TARGET_FILE:TestLive555_Integration> --duration=3
-          --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>)
+          --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>
+  WORKING_DIRECTORY "$<TARGET_FILE_DIR:TestLive555_Integration>")
 
 add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
 add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)
