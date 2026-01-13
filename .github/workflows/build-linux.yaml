@@ -53,27 +53,20 @@ jobs:
         id: test-debug-coverage
         working-directory: build/Debug-Coverage
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
-        continue-on-error: true
 
       - name: Generate GCOV Report
         run: |
           apt-get update && apt-get install gcovr -y
           gcovr --root ../.. --lcov -o lcov.info
         working-directory: ./build/Debug-Coverage/
-        continue-on-error: true
+        if: always()
 
       - name: Upload GCOV Report to Coveralls
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: ./build/Debug-Coverage/lcov.info
-        continue-on-error: true
-
-      - name: Check Test Failure
-        if: ${{ steps.test-debug-coverage.conclusion == 'failure' }}
-        run: |
-          echo "Tests Failed check logs"
-          exit 1
+        if: always()
 
   build_and_test_release:
     name: Build and Test (Linux/Release)
