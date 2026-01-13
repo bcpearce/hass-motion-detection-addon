@@ -14,8 +14,8 @@ env:
 
 jobs:
 
-  build_and_test:
-    name: Build and Test (Linux)
+  build_and_test_debug:
+    name: Build and Test (Linux/Debug-Coverage)
     strategy:
       matrix:
         arch: [ amd64, arm64 ]
@@ -64,6 +64,28 @@ jobs:
           path-to-lcov: ./build/Debug-Coverage/lcov.info
         continue-on-error: true
 
+  build_and_test_release:
+    name: Build and Test (Linux/Release)
+    strategy:
+      matrix:
+        arch: [ amd64, arm64 ]
+        include:
+          - arch: amd64
+            os: ubuntu-24.04
+          - arch: arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    container:
+      image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/vcpkg-cache
+        with:
+          username: bcpearce
+          password: ${{ secrets.GH_PACKAGES_TOKEN }}
+          vcpkg-git-ref: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
+          feed-url: https://nuget.pkg.github.com/bcpearce/index.json
       - name: Generate and Configure Release
         run: cmake . --preset=Release -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
@@ -92,7 +114,7 @@ jobs:
 
   build_docker_image:
     name: Build and Upload Docker Image (Linux)
-    needs: build_and_test
+    needs: build_and_test_release
     strategy:
       fail-fast: false
       matrix:
@@ -208,7 +230,7 @@ jobs:
 
   release-debian:
     runs-on: ubuntu-latest
-    needs: build_and_test
+    needs: build_and_test_release
     if: ${{ github.ref_type == 'tag' }}
     steps:
       - name: Download Build Artifact
