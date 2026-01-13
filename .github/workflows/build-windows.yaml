@@ -62,7 +62,7 @@ jobs:
 
       - name: Test Debug
         working-directory: build/Debug-Coverage
-        run: ctest --output-junit test_detail_debug.xml --output-on-failure -E "^TestLive555_Integration\.*"
+        run: ctest --output-junit test_detail_debug.xml --output-on-failure
 
       - name: Generate and Configure Release
         run: cmake . \
@@ -76,7 +76,7 @@ jobs:
 
       - name: Test Release
         working-directory: build/Release
-        run: ctest --output-junit test_detail_release.xml --output-on-failure -E "^TestLive555_Integration\.*"
+        run: ctest --output-junit test_detail_release.xml --output-on-failure
 
       - name: Test Summary
         uses: test-summary/action@v2
