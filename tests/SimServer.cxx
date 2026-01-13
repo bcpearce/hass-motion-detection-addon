@@ -167,11 +167,6 @@ void SimServer::Start(int port) noexcept {
     mg_mgr_init(&mgr);
     mg_connection *c = mg_http_listen(&mgr, url.c_str(), ev_handler, nullptr);
     if (c) {
-      if (url.port_number() == 0) {
-        // Retrieve  the auto-set port
-        url.set_port(std::to_string(c->loc.port));
-        LOGGER->info("[SIM SERVER] port selected automatically", url.port());
-      }
       LOGGER->info("[SIM SERVER] port set to {}", url.port());
       sync.arrive_and_drop();
       while (!stopToken.stop_requested()) {
