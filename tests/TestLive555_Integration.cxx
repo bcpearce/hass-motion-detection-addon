@@ -2,10 +2,11 @@
 
 #include "Logger.h"
 
+#include "Callback/BaseHassHandler.h"
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
-#include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
+#include "VideoSource/RestartWatcher.h"
 #include <BasicUsageEnvironment.hh>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
@@ -116,9 +117,18 @@ TEST_F(Live555VideoSourceTests, Smoke) {
   }
 
   auto pSched = std::shared_ptr<TaskScheduler>(BasicTaskScheduler::createNew());
-  video_source::Live555VideoSource live555(pSched, rtspServerUrl_);
+  auto pSource = std::make_shared<video_source::Live555VideoSource>(
+      pSched, rtspServerUrl_);
+
+  // Install a restart watcher
+  video_source::RestartWatcher<callback::BaseHassHandler> watcher(
+      "Live555", pSource, pSched);
+  watcher.interval = 1s;
+  watcher.minInterval = 1s;
+  watcher.maxInterval = 10s;
+
   asio::post(ioCtx_, [&] {
-    live555.StartStream();
+    pSource->StartStream();
     EventLoopWatchVariable wv;
     pSched->scheduleDelayedTask(
         std::chrono::microseconds(args.duration).count(), StopStream, &wv);
@@ -126,7 +136,7 @@ TEST_F(Live555VideoSourceTests, Smoke) {
   });
 
   ioCtx_.run();
-  EXPECT_GT(live555.GetFrameCount(), 0);
+  EXPECT_GT(pSource->GetFrameCount(), 0);
 }
 
 int main(int argc, char **argv) {
