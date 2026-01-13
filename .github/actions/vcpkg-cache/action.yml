@@ -31,7 +31,7 @@ runs:
     - name: Get VCPKG
       shell: bash
       run: |
-          git clone https://github.com/microsoft/vcpkg.git ${{ inputs.vcpkg-root }}
+          git -c advice.detachedHead=false clone https://github.com/microsoft/vcpkg.git ${{ inputs.vcpkg-root }}
           cd ${{ inputs.vcpkg-root }} && git checkout ${{ inputs.vcpkg-git-ref }}
 
     - name: Bootstrap vcpkg

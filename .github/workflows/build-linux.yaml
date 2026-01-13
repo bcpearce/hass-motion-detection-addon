@@ -9,6 +9,8 @@ on:
   pull_request:
 
 env:
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
   DOCKER_REGISTRY_IMAGE: "bcpearce/hass-motion-detection-addon"
 
@@ -36,6 +38,8 @@ jobs:
         with:
           username: bcpearce
           password: ${{ secrets.GH_PACKAGES_TOKEN }}
+          vcpkg-root: ${{ env.VCPKG_ROOT }}
+          vcpkg-exe: ${{ env.VCPKG_EXE }}
           vcpkg-git-ref: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
           feed-url: https://nuget.pkg.github.com/bcpearce/index.json
 
