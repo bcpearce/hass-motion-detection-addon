@@ -2,7 +2,6 @@
 
 #include "Logger.h"
 
-#include "Callback/BaseHassHandler.h"
 #include "Util/BufferOperations.h"
 #include "Util/CurlWrapper.h"
 #include "VideoSource/Live555.h"
@@ -27,14 +26,19 @@ namespace bp2 = boost::process::v2;
 namespace asio = boost::asio;
 
 struct Args {
-  std::chrono::seconds duration;
+  std::chrono::seconds duration{10};
   std::filesystem::path rtspServerExec;
 };
 Args args;
 
-void StopStream(void *clientData) {
+void StopEventLoop(void *clientData) {
   auto &wv = *static_cast<EventLoopWatchVariable *>(clientData);
   wv.store(1);
+}
+
+void StopStream(void *clientData) {
+  auto &source = *static_cast<video_source::Live555VideoSource *>(clientData);
+  source.StopStream();
 }
 
 class Live555VideoSourceTests : public testing::Test {
@@ -72,6 +76,8 @@ protected:
       }
       LOGGER->info("[RTSP SERVER] {}", line);
       doRead();
+    } else if (ec == asio::error::eof) {
+      LOGGER->info("[RTSP SERVER] received EOF");
     } else {
       LOGGER->error("[RTSP SERVER] an error occurred {}", ec.what());
     }
@@ -121,22 +127,35 @@ TEST_F(Live555VideoSourceTests, Smoke) {
       pSched, rtspServerUrl_);
 
   // Install a restart watcher
-  video_source::RestartWatcher<callback::BaseHassHandler> watcher(
-      "Live555", pSource, pSched);
+  bool didUpdateListener{false};
+  struct Callback {
+    bool didUpdateListener{false};
+    void operator()(int) { didUpdateListener = true; }
+  };
+  EventLoopWatchVariable wv{0};
+  auto spCallback = std::make_shared<Callback>();
+  video_source::RestartWatcher<Callback> watcher("Live555", pSource, pSched);
+  watcher.wpCallbacks.push_back(spCallback);
   watcher.interval = 1s;
   watcher.minInterval = 1s;
   watcher.maxInterval = 10s;
 
   asio::post(ioCtx_, [&] {
     pSource->StartStream();
-    EventLoopWatchVariable wv;
     pSched->scheduleDelayedTask(
-        std::chrono::microseconds(args.duration).count(), StopStream, &wv);
+        std::chrono::microseconds(args.duration).count(), StopStream,
+        pSource.get());
+    pSched->scheduleDelayedTask(
+        std::chrono::microseconds(args.duration).count() * 2, StopEventLoop,
+        &wv);
     pSched->doEventLoop(&wv);
   });
 
   ioCtx_.run();
   EXPECT_GT(pSource->GetFrameCount(), 0);
+  EXPECT_TRUE(spCallback->didUpdateListener);
+  EXPECT_GT(watcher.GetNullPayloadUpdates(), 0);
+  EXPECT_GT(watcher.GetRestartAttempts(), 0);
 }
 
 int main(int argc, char **argv) {
@@ -148,7 +167,8 @@ int main(int argc, char **argv) {
       const auto prefix = arg.substr(0, end);
       const auto value = arg.substr(prefix.size() + 1);
       if (prefix == "--duration") {
-        args.duration = std::chrono::seconds{std::stoi(std::string(value))};
+        args.duration =
+            std::min(10s, std::chrono::seconds{std::stoi(std::string(value))});
       } else if (prefix == "--rtspServerExec") {
         args.rtspServerExec = std::filesystem::path(value);
       }

@@ -1,22 +1,15 @@
 #pragma once
 
+#include "Logger.h"
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <vector>
 
-#include "Logger.h"
-
 namespace video_source {
 
-template <class Callback_t> struct RestartWatcher {
-  std::string sourceDesc;
-  std::weak_ptr<video_source::VideoSource> wpSource;
-  std::weak_ptr<TaskScheduler> wpSched;
-  std::vector<std::weak_ptr<Callback_t>> wpCallbacks;
-
-  std::chrono::microseconds minInterval{std::chrono::seconds(3)};
-  std::chrono::microseconds maxInterval{std::chrono::seconds(60)};
-  std::chrono::microseconds interval{minInterval};
+template <class Callback_t = std::function<void(int)>> class RestartWatcher {
+public:
   static void CheckAndRestart(void *clientData_restartWatcher) {
     if (clientData_restartWatcher) {
       auto &restartWatcher =
@@ -31,9 +24,11 @@ template <class Callback_t> struct RestartWatcher {
           if (auto sp = wp.lock()) {
             // send a null payload to the callbacks
             (*sp)({});
+            ++restartWatcher.nullPayloadUpdates_;
           }
         }
         spSource->StartStream();
+        ++restartWatcher.restartAttempts_;
         restartWatcher.interval =
             std::min(restartWatcher.interval * 2, restartWatcher.maxInterval);
         LOGGER->info("Checking Video Source {} for status in {} seconds",
@@ -60,6 +55,22 @@ template <class Callback_t> struct RestartWatcher {
       pSched->scheduleDelayedTask(interval.count(), CheckAndRestart, this);
     }
   }
+
+  int GetRestartAttempts() const { return restartAttempts_; }
+  int GetNullPayloadUpdates() const { return nullPayloadUpdates_; }
+
+  std::string sourceDesc;
+  std::weak_ptr<video_source::VideoSource> wpSource;
+  std::weak_ptr<TaskScheduler> wpSched;
+  std::vector<std::weak_ptr<Callback_t>> wpCallbacks;
+
+  std::chrono::microseconds minInterval{std::chrono::seconds(3)};
+  std::chrono::microseconds maxInterval{std::chrono::seconds(60)};
+  std::chrono::microseconds interval{minInterval};
+
+private:
+  int restartAttempts_{0};
+  int nullPayloadUpdates_{0};
 };
 
 } // namespace video_source
