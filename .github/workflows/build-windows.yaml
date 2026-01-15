@@ -16,14 +16,14 @@ env:
 
 jobs:
 
-  build_and_test:
-    name: Build and Test (Windows)
+  build_and_test_debug:
+    name: Build and Test (Windows/Debug)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: true
-
+          lfs: true
       - name: Install LLVM (Clang) 19
         run: choco install llvm --version=19.1.5 --allow-downgrade
 
@@ -63,6 +63,40 @@ jobs:
       - name: Test Debug
         working-directory: build/Debug
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
+
+  build_and_test_release:
+    name: Build and Test (Windows/Release)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+          lfs: true
+      - name: Install LLVM (Clang) 19
+        run: choco install llvm --version=19.1.5 --allow-downgrade
+
+      - name: Get VCPKG
+        run: |
+            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+
+      - name: Add NuGet sources
+        shell: pwsh
+        run: |
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+             sources add `
+             -Source "${{ env.FEED_URL }}" `
+             -StorePasswordInClearText `
+             -Name GitHubPackages `
+             -UserName "${{ env.USERNAME }}" `
+             -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+             setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" `
+             -Source "${{ env.FEED_URL }}"
 
       - name: Generate and Configure Release
         run: cmake . \
