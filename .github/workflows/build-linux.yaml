@@ -34,7 +34,9 @@ jobs:
       - uses: actions/checkout@v6
 =======
       - name: Install git-lfs
-        run: git lfs install
+        run: |
+          apt-get update && apt-get install -y git-lfs
+          git lfs install
 
       - uses: actions/checkout@v4
 >>>>>>> 9e69e86 (Update CI and Working Dir)
@@ -92,7 +94,9 @@ jobs:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
     steps:
       - name: Install git-lfs
-        run: git lfs install
+        run: |
+          apt-get update && apt-get install -y git-lfs
+          git lfs install
 
       - uses: actions/checkout@v4
         with:
@@ -103,8 +107,11 @@ jobs:
         with:
           username: bcpearce
           password: ${{ secrets.GH_PACKAGES_TOKEN }}
+          vcpkg-root: ${{ env.VCPKG_ROOT }}
+          vcpkg-exe: ${{ env.VCPKG_EXE }}
           vcpkg-git-ref: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
           feed-url: https://nuget.pkg.github.com/bcpearce/index.json
+
       - name: Generate and Configure Release
         run: cmake . --preset=Release -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
