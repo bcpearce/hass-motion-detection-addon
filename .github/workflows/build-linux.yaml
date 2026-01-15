@@ -30,12 +30,20 @@ jobs:
     container:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@v6
+=======
+      - name: Install git-lfs
+        run: git lfs install
+
+      - uses: actions/checkout@v4
+>>>>>>> 9e69e86 (Update CI and Working Dir)
         with:
           submodules: true
           lfs: true
 
       - uses: ./.github/actions/vcpkg-cache
+        name: Get VCPKG Cache
         with:
           username: bcpearce
           password: ${{ secrets.GH_PACKAGES_TOKEN }}
@@ -83,11 +91,15 @@ jobs:
     container:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
     steps:
+      - name: Install git-lfs
+        run: git lfs install
+
       - uses: actions/checkout@v4
         with:
           lfs: true
 
       - uses: ./.github/actions/vcpkg-cache
+        name: Get VCPKG Cache
         with:
           username: bcpearce
           password: ${{ secrets.GH_PACKAGES_TOKEN }}
