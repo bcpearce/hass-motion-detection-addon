@@ -22,7 +22,8 @@
     {
       "name": "Debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address"
       },
       "inherits": "vcpkg"
     },
