@@ -24,6 +24,8 @@ int curlDebugCallback(CURL *handle, curl_infotype type, char *data, size_t sz,
       }
     }
   } break;
+  default:
+    break;
   }
   return 0;
 }
