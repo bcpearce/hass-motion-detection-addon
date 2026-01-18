@@ -161,7 +161,7 @@ void SimServer::Start(int port) noexcept {
   listenerThread = std::jthread([&sync](std::stop_token stopToken) {
     struct mg_mgr mgr;
 #ifdef _DEBUG
-#if 0
+#if 1
     mg_log_set(MG_LL_DEBUG);
     mg_log_set_fn(redirectLog, nullptr);
 #endif

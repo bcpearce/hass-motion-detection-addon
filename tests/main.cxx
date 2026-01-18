@@ -6,9 +6,9 @@
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
 
-  std::ignore = testing::AddGlobalTestEnvironment(
+  testing::AddGlobalTestEnvironment(
       std::make_unique<LoggerEnvironment>().release());
-  std::ignore = testing::AddGlobalTestEnvironment(
+  testing::AddGlobalTestEnvironment(
       std::make_unique<ServerEnvironment>().release());
 
   return RUN_ALL_TESTS();
