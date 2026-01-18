@@ -5,7 +5,7 @@
     "repository": "https://github.com/microsoft/vcpkg"
   },
   "overlay-ports": [
-    "./ports"
+    "./Live555-Overlay-Port/ports"
   ],
   "registries": [
     {
