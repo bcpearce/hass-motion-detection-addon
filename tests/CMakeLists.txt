@@ -38,7 +38,7 @@ target_compile_definitions(${UNIT_TEST_PROJECT}
                            PRIVATE SIM_SERVER_PORT=${SIM_SERVER_PORT})
 
 include(GoogleTest)
-# gtest_discover_tests(${UNIT_TEST_PROJECT} TEST_LIST UNIT_TESTS)
+gtest_discover_tests(${UNIT_TEST_PROJECT} TEST_LIST UNIT_TESTS)
 
 add_executable(Live555_IntegrationTest Live555_IntegrationTest.cxx LogEnv.h)
 find_package(Boost REQUIRED COMPONENTS asio process)
