@@ -96,9 +96,10 @@ jobs:
           apt-get update && apt-get install -y git-lfs
           git lfs install
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
+          submodules: true
 
       - uses: ./.github/actions/vcpkg-cache
         name: Get VCPKG Cache
