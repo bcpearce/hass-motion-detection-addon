@@ -11,3 +11,4 @@ out/
 Testing/
 .vscode/launch.json
 *.log
+node_modules/
