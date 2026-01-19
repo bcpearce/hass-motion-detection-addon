@@ -32,16 +32,12 @@ jobs:
     container:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
     steps:
-<<<<<<< HEAD
-      - uses: actions/checkout@v6
-=======
       - name: Install git-lfs
         run: |
           apt-get update && apt-get install -y git-lfs
           git lfs install
 
-      - uses: actions/checkout@v4
->>>>>>> 9e69e86 (Update CI and Working Dir)
+      - uses: actions/checkout@v6
         with:
           submodules: true
           lfs: true
