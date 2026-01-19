@@ -20,7 +20,10 @@ jobs:
     name: Build and Test (Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
       - name: Install LLVM (Clang) 19
         run: choco install llvm --version=19.1.5 --allow-downgrade
 
