@@ -170,9 +170,13 @@ void SimServer::Start(int port) noexcept {
     mg_connection *c = mg_http_listen(&mgr, url.c_str(), ev_handler, nullptr);
     if (c) {
       LOGGER->info("[SIM SERVER] port set to {}", url.port());
-      sync.arrive_and_drop();
+      bool dropBar{true};
       while (!stopToken.stop_requested()) {
         mg_mgr_poll(&mgr, 1000);
+        if (dropBar) { // do once
+          dropBar = false;
+          sync.arrive_and_drop();
+        }
       }
     } else {
       sync.arrive_and_drop();
