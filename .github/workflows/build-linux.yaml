@@ -33,7 +33,9 @@ jobs:
     container:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - name: Get VCPKG
         run: |
@@ -127,7 +129,9 @@ jobs:
             platform: linux/arm64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - name: Prepare
         run: |
