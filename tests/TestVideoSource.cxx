@@ -81,8 +81,16 @@ TEST(HttpVideoSourceTests, TestReceiveLargeFrame) {
   }
 }
 
-TEST(Live555VideoSourceTests, Smoke) {
+TEST(Live555VideoSourceTests, NoUrl) {
   auto pSched = std::shared_ptr<TaskScheduler>(BasicTaskScheduler::createNew());
   video_source::Live555VideoSource live555(pSched, boost::url(""));
   EXPECT_THROW(live555.StartStream(0), std::runtime_error);
+}
+
+TEST(Live555VideoSourceTests, BadUrl) {
+  auto pSched = std::shared_ptr<TaskScheduler>(BasicTaskScheduler::createNew());
+  video_source::Live555VideoSource live555(pSched,
+                                           boost::url("http://localhost"));
+  EXPECT_NO_THROW(live555.StartStream())
+      << "Expected Stream to fail due to incorrect protocol";
 }

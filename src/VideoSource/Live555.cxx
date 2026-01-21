@@ -383,12 +383,13 @@ void Live555VideoSource::StopStream_Impl() {
   }
   if (pEnv_) {
     pEnv_->reclaim();
+    pEnv_ = nullptr;
   }
 }
 
 void continueAfterDESCRIBE(RTSPClient *rtspClient, int resultCode,
                            char *resultString) {
-  auto upResultString = std::unique_ptr<char>(resultString);
+  auto upResultString = std::unique_ptr<char[]>(resultString);
   auto *frameRtspClient = dynamic_cast<FrameRtspClient *>(rtspClient);
   if (!frameRtspClient) {
     return;

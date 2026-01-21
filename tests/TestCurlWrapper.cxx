@@ -10,22 +10,31 @@
 
 TEST(CurlWrapperTests, Smoke) {
   util::CurlWrapper wCurl;
+  util::CurlWrapper otherWCurl = std::move(wCurl);
+  util::CurlWrapper yetAnotherWCurl(std::move(otherWCurl));
+  EXPECT_EQ(nullptr, &wCurl);
+  EXPECT_EQ(nullptr, &otherWCurl);
 
   curl_off_t uploadData{0};
-  wCurl(curl_easy_getinfo, CURLINFO_CONTENT_LENGTH_UPLOAD_T, &uploadData);
+  yetAnotherWCurl(curl_easy_getinfo, CURLINFO_CONTENT_LENGTH_UPLOAD_T,
+                  &uploadData);
   EXPECT_EQ(uploadData, -1);
-  EXPECT_NO_THROW(curl_easy_reset(&wCurl));
+  EXPECT_NO_THROW(curl_easy_reset(&yetAnotherWCurl));
 }
 
 TEST(CurlMultiWrapperTests, Smoke) {
-  util::CurlMultiWrapper wCurl;
-  CURL **handles = curl_multi_get_handles(wCurl.pCurl_);
+  util::CurlMultiWrapper wCurlMulti;
+  util::CurlMultiWrapper otherWCurlMulti = std::move(wCurlMulti);
+  util::CurlMultiWrapper yetAnotherWCurlMulti(std::move(otherWCurlMulti));
+  EXPECT_EQ(nullptr, wCurlMulti.pCurl_);
+  EXPECT_EQ(nullptr, otherWCurlMulti.pCurl_);
+
+  CURL **handles = curl_multi_get_handles(yetAnotherWCurlMulti.pCurl_);
   EXPECT_EQ(handles[0], nullptr);
   curl_free(handles);
 }
 
 TEST(CurlWrapperTests, CanMakeGetRequest) {
-
   util::CurlWrapper wCurl;
 
   boost::url url = SimServer::GetBaseUrl();

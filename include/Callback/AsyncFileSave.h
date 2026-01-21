@@ -82,7 +82,7 @@ private:
 #if _WIN32
   struct Win32Overlapped {
     HANDLE hFile{INVALID_HANDLE_VALUE};
-    OVERLAPPED overlapped{.hEvent{0}};
+    OVERLAPPED overlapped{.hEvent = 0};
     LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine{nullptr};
     std::vector<char> buf;
     std::filesystem::path dstPath;

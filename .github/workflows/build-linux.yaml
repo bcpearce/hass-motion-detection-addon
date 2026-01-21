@@ -9,18 +9,76 @@ on:
   pull_request:
 
 env:
-  USERNAME: bcpearce
   VCPKG_ROOT: ${{ github.workspace }}/vcpkg
   VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-  VCPKG_GIT_REF: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
-  FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
   DOCKER_REGISTRY_IMAGE: "bcpearce/hass-motion-detection-addon"
 
 jobs:
 
-  build_and_test:
-    name: Build and Test (Linux)
+  build_and_test_debug:
+    name: Build and Test (Linux/Debug-Coverage)
+    strategy:
+      matrix:
+        arch: [ amd64, arm64 ]
+        include:
+          - arch: amd64
+            os: ubuntu-24.04
+            upload-coverage: true
+          - arch: arm64
+            os: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.os }}
+    container:
+      image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
+    steps:
+      - name: Install git-lfs
+        run: |
+          apt-get update && apt-get install -y git-lfs
+          git lfs install
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+          lfs: true
+
+      - uses: ./.github/actions/vcpkg-cache
+        name: Get VCPKG Cache
+        with:
+          username: bcpearce
+          password: ${{ secrets.GH_PACKAGES_TOKEN }}
+          vcpkg-root: ${{ env.VCPKG_ROOT }}
+          vcpkg-exe: ${{ env.VCPKG_EXE }}
+          vcpkg-git-ref: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
+          feed-url: https://nuget.pkg.github.com/bcpearce/index.json
+
+      - name: Generate and Configure Debug-Coverage
+        run: cmake . --preset=Debug-Coverage -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build Debug-Coverage
+        run: cmake --build build/Debug-Coverage
+
+      - name: Test Debug-Coverage
+        id: test-debug-coverage
+        working-directory: build/Debug-Coverage
+        run: ctest --output-junit test_detail_debug.xml --output-on-failure
+
+      - name: Generate GCOV Report
+        run: |
+          apt-get update && apt-get install gcovr -y
+          gcovr --root ../.. --lcov -o lcov.info
+        working-directory: ./build/Debug-Coverage/
+        if: always()
+
+      - name: Upload GCOV Report to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./build/Debug-Coverage/lcov.info
+        if: ${{ matrix.upload-coverage }}
+
+  build_and_test_release:
+    name: Build and Test (Linux/Release)
     strategy:
       matrix:
         arch: [ amd64, arm64 ]
@@ -33,59 +91,25 @@ jobs:
     container:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
     steps:
+      - name: Install git-lfs
+        run: |
+          apt-get update && apt-get install -y git-lfs
+          git lfs install
+
       - uses: actions/checkout@v6
         with:
+          lfs: true
           submodules: true
 
-      - name: Get VCPKG
-        run: |
-            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
-
-      - name: Bootstrap vcpkg
-        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
-
-      - name: Add NuGet sources
-        env:
-          VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-          USERNAME: bcpearce
-          FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
-        run: |
-          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            sources add \
-            -Source "${{ env.FEED_URL }}" \
-            -StorePasswordInClearText \
-            -Name GitHubPackages \
-            -UserName "${{ env.USERNAME }}" \
-            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
-            setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
-            -Source "${{ env.FEED_URL }}"
-
-      - name: Generate and Configure Debug-Coverage
-        run: cmake . --preset=Debug-Coverage -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
-
-      - name: Build Debug-Coverage
-        run: cmake --build build/Debug-Coverage
-
-      - name: Test Debug
-        run: ctest --output-junit test_detail_debug.xml --output-on-failure
-        working-directory: ./build/Debug-Coverage/
-        continue-on-error: true
-
-      - name: Generate GCOV Report
-        run: |
-          apt-get update && apt-get install gcovr -y
-          gcovr --root ../.. --lcov -o lcov.info
-        working-directory: ./build/Debug-Coverage/
-        continue-on-error: true
-
-      - name: Upload GCOV Report to Coveralls
-        uses: coverallsapp/github-action@v2
+      - uses: ./.github/actions/vcpkg-cache
+        name: Get VCPKG Cache
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./build/Debug-Coverage/lcov.info
-        continue-on-error: true
+          username: bcpearce
+          password: ${{ secrets.GH_PACKAGES_TOKEN }}
+          vcpkg-root: ${{ env.VCPKG_ROOT }}
+          vcpkg-exe: ${{ env.VCPKG_EXE }}
+          vcpkg-git-ref: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
+          feed-url: https://nuget.pkg.github.com/bcpearce/index.json
 
       - name: Generate and Configure Release
         run: cmake . --preset=Release -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
@@ -94,8 +118,8 @@ jobs:
         run: cmake --build build/Release
 
       - name: Test Release
-        run: ctest --output-junit test_detail_release.xml --output-on-failure
-        working-directory: ./build/Release
+        working-directory: build/Release
+        run: ctest --output-junit test_detail_integration_release.xml --output-on-failure
 
       - name: Test Summary
         uses: test-summary/action@v2
@@ -115,7 +139,7 @@ jobs:
 
   build_docker_image:
     name: Build and Upload Docker Image (Linux)
-    needs: build_and_test
+    needs: build_and_test_release
     strategy:
       fail-fast: false
       matrix:
@@ -231,7 +255,7 @@ jobs:
 
   release-debian:
     runs-on: ubuntu-latest
-    needs: build_and_test
+    needs: build_and_test_release
     if: ${{ github.ref_type == 'tag' }}
     steps:
       - name: Download Build Artifact

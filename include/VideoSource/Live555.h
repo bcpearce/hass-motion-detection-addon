@@ -20,7 +20,7 @@ class Live555VideoSource : public VideoSource {
   friend class FrameSetterSink;
 
 public:
-  Live555VideoSource() noexcept = default;
+  Live555VideoSource() noexcept = delete;
   Live555VideoSource(std::shared_ptr<TaskScheduler> pSched,
                      const boost::url &url, std::string_view username = {},
                      std::string_view password = {});

@@ -31,8 +31,9 @@ void ThreadedHassHandler::Start() {
   wCurl(curl_easy_perform);
   HandleGetResponse(wCurl, buf_);
 
-  updaterThread_ = std::jthread(
-      [this, wCurl = std::move(wCurl)](std::stop_token stopToken) mutable {
+  updaterThread_ =
+      std::jthread([this, wCurl = std::move(wCurl), payload = std::string()](
+                       std::stop_token stopToken) mutable {
 #ifdef _WIN32
         SetThreadDescription(GetCurrentThread(),
                              L"Home Assistant Handler Sensor Update Thread");
@@ -53,7 +54,6 @@ void ThreadedHassHandler::Start() {
           if ((stateChanging && debounce) || IsStateBecomingUnknown()) {
             buf_.clear();
             try {
-              thread_local std::string payload; // reusable buffer
               PreparePostRequest(wCurl, buf_, payload);
               wCurl(curl_easy_perform);
               HandlePostResponse(wCurl, buf_);

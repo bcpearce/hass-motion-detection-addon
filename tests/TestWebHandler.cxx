@@ -20,25 +20,36 @@ using namespace std::string_view_literals;
 
 using json = nlohmann::json;
 
-class WebHandlerTests : public testing::TestWithParam<int> {
+struct ImageTypeAllowed {
+  int imageType;
+  bool allowed;
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const ImageTypeAllowed &ita) {
+    os << std::format("channels:{}, Allowed:{}", CV_MAT_CN(ita.imageType),
+                      ita.allowed);
+    return os;
+  }
+};
+class WebHandlerTests : public testing::TestWithParam<ImageTypeAllowed> {
 protected:
   void SetUp() override {
-    pWh_ = std::make_unique<gui::WebHandler>(32836);
+    pWh_ = std::make_unique<gui::WebHandler>(32836, "localhost");
     pWh_->Start();
   }
 
   void TearDown() override { pWh_->Stop(); }
 
-  std::string GetServerUrl() const { return "http://localhost:32836"s; }
+  std::string GetServerUrl() const {
+    return {pWh_->GetUrl().data(), pWh_->GetUrl().size()};
+  }
 
   std::unique_ptr<gui::WebHandler> pWh_;
 };
 
 TEST_P(WebHandlerTests, CanSetImage) {
-
   gui::Payload data{.feedId = "test"sv};
 
-  const int matType{GetParam()};
+  const auto [matType, allowed] = GetParam();
 
   using sc = std::chrono::steady_clock;
 
@@ -48,11 +59,14 @@ TEST_P(WebHandlerTests, CanSetImage) {
   data.detail = cv::Mat::zeros(400, 400, matType);
   data.fps = 30.0;
 
-  EXPECT_NO_THROW((*pWh_)(data));
+  if (allowed) {
+    EXPECT_NO_THROW((*pWh_)(data));
+  } else {
+    EXPECT_THROW((*pWh_)(data), std::invalid_argument);
+  }
 }
 
 TEST_F(WebHandlerTests, CanAccessPackedFilesystem) {
-
   // read the packed index.html to compare later
   const auto indexPath =
       std::filesystem::path(__FILE__).parent_path().parent_path() / "src" /
@@ -82,22 +96,66 @@ TEST_F(WebHandlerTests, LoadAndReadBackFeedIds) {
   (*pWh_)({.feedId = "feed2"sv});
   (*pWh_)({.feedId = "feed3"sv});
 
-  util::CurlWrapper wCurl;
   std::vector<char> buf;
-  EXPECT_NO_THROW(std::invoke([&] {
-    const auto url = GetServerUrl() + "/media/feeds"s;
-    wCurl(curl_easy_setopt, CURLOPT_URL, url.c_str());
-    wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
-    wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
-    wCurl(curl_easy_perform);
-  }));
-
-  json res = json::parse(buf);
+  json res = std::invoke([&] {
+    util::CurlWrapper wCurl;
+    EXPECT_NO_THROW(std::invoke([&] {
+      const auto url = GetServerUrl() + "/media/feeds"s;
+      wCurl(curl_easy_setopt, CURLOPT_URL, url.c_str());
+      wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
+      wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
+      wCurl(curl_easy_perform);
+    }));
+    return json::parse(buf);
+  });
 
   EXPECT_THAT(res, testing::Contains("feed1"));
   EXPECT_THAT(res, testing::Contains("feed2"));
   EXPECT_THAT(res, testing::Contains("feed3"));
 }
 
+TEST_F(WebHandlerTests, LoadFeed) {
+  (*pWh_)({.feedId = "feed1"sv});
+  util::CurlWrapper wCurl;
+  std::vector<char> headerBuf;
+
+  for (const auto feed : {"feed1"sv, "feedunknown"sv}) {
+    for (const auto slug : {"live"sv, "model"sv}) {
+      EXPECT_NO_THROW(std::invoke([&] {
+        const auto url =
+            std::format("{}/media/{}/{}", GetServerUrl(), slug, feed);
+        wCurl(curl_easy_setopt, CURLOPT_URL, url.c_str());
+        wCurl(curl_easy_setopt, CURLOPT_NOBODY, 1);
+        wCurl(curl_easy_perform);
+      }));
+
+      curl_header *hdr;
+      curl_easy_header(&wCurl, "Cache-Control", 0, CURLH_HEADER, -1, &hdr);
+      EXPECT_THAT(hdr->value, testing::HasSubstr("no-cache"sv));
+      curl_easy_header(&wCurl, "Content-Type", 0, CURLH_HEADER, -1, &hdr);
+      EXPECT_THAT(hdr->value, testing::HasSubstr("multipart"sv));
+      EXPECT_THAT(hdr->value, testing::HasSubstr("boundary"sv));
+    }
+  }
+}
+
+TEST_F(WebHandlerTests, FailToGetSavedMedia) {
+  std::vector<char> buf;
+  util::CurlWrapper wCurl;
+  EXPECT_NO_THROW(std::invoke([&] {
+    const auto url = GetServerUrl() + "/media/saved/noMedia"s;
+    wCurl(curl_easy_setopt, CURLOPT_URL, url.c_str());
+    wCurl(curl_easy_setopt, CURLOPT_WRITEDATA, &buf);
+    wCurl(curl_easy_setopt, CURLOPT_WRITEFUNCTION, util::FillBufferCallback);
+    wCurl(curl_easy_perform);
+  }));
+  int code{0};
+  wCurl(curl_easy_getinfo, CURLINFO_HTTP_CODE, &code);
+  EXPECT_EQ(404, code);
+}
+
 INSTANTIATE_TEST_SUITE_P(ImageTypes, WebHandlerTests,
-                         testing::Values(CV_8UC1, CV_8UC3, CV_8UC4));
+                         testing::Values(ImageTypeAllowed{CV_8UC1, true},
+                                         ImageTypeAllowed{CV_8UC2, false},
+                                         ImageTypeAllowed{CV_8UC3, true},
+                                         ImageTypeAllowed{CV_8UC4, true}));
