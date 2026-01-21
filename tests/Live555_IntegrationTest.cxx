@@ -62,6 +62,7 @@ protected:
       std::istream is(&streamBuf_);
       std::string line;
       std::getline(is, line);
+      boost::trim_right(line);
       if (line.ends_with(fmt::format("\"{}\"", resourceFile))) {
         captureUrl_ = true;
       } else if (captureUrl_) {

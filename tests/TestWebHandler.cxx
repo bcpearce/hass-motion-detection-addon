@@ -33,7 +33,7 @@ struct ImageTypeAllowed {
 class WebHandlerTests : public testing::TestWithParam<ImageTypeAllowed> {
 protected:
   void SetUp() override {
-    pWh_ = std::make_unique<gui::WebHandler>(32836);
+    pWh_ = std::make_unique<gui::WebHandler>(32836, "localhost");
     pWh_->Start();
   }
 

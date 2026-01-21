@@ -187,10 +187,14 @@ void WebHandler::Start() {
     mg_timer_add(&mgr_, 33, MG_TIMER_REPEAT, BroadcastImage_TimerCallback,
                  &feedImageDataMap_);
     mg_wakeup_init(&mgr_);
-    sync.arrive_and_drop();
     mg_http_listen(&mgr_, url_.c_str(), EventHandler, nullptr);
+    bool dropBar{true};
     while (!stopToken.stop_requested()) {
       mg_mgr_poll(&mgr_, 100);
+      if (dropBar) {
+        sync.arrive_and_drop();
+        dropBar = false;
+      }
     }
     mg_mgr_free(&mgr_);
   });
