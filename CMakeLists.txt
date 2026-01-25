@@ -5,13 +5,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
 
-if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(STATUS "Enabling AddressSanitizer for GCC")
-    add_compile_options(-fsanitize=address)
-    add_link_options(-fsanitize=address)
-  endif()
-endif()
+# if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+# if(CMAKE_BUILD_TYPE STREQUAL "Debug") message(STATUS "Enabling
+# AddressSanitizer for GCC") add_compile_options(-fsanitize=address)
+# add_link_options(-fsanitize=address) endif() endif()
 
 include_directories(AFTER "${CMAKE_BINARY_DIR}/include")
 
