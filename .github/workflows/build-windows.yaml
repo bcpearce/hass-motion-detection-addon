@@ -64,6 +64,13 @@ jobs:
         working-directory: build/Debug
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
 
+      - name: End to End Test Debug
+        uses: ./.github/actions/end-to-end-test
+        with:
+          motion-detection-exec: ${{ github.workspace }}/build/Debug/MotionDetection
+          rtsp-server-exec: ${{ github.workspace }}/build/Debug/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          resource-file: ${{ github.workspace }}/tests/res/test.264
+
   build_and_test_release:
     name: Build and Test (Windows/Release)
     runs-on: windows-latest
@@ -111,6 +118,13 @@ jobs:
       - name: Test Release
         working-directory: build/Release
         run: ctest --output-junit test_detail_release.xml --output-on-failure
+
+      - name: End to End Test Release
+        uses: ./.github/actions/end-to-end-test
+        with:
+          motion-detection-exec: ${{ github.workspace }}/build/Release/MotionDetection
+          rtsp-server-exec: ${{ github.workspace }}/build/Release/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          resource-file: ${{ github.workspace }}/tests/res/test.264
 
       - name: Test Summary
         uses: test-summary/action@v2
