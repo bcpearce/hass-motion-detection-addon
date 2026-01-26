@@ -97,7 +97,7 @@ jobs:
             triplet: x64-linux
           - arch: arm64
             os: ubuntu-24.04-arm
-            triplet: x64-linux
+            triplet: arm64-linux
     runs-on: ${{ matrix.os }}
     container:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
