@@ -30,7 +30,7 @@ TEST_P(TestThreadedHassHandler, CanPostEntityUpdate) {
   const int startApiCalls = SimServer::GetHassApiCount();
   const std::string entityId{GetParam()};
   {
-    std::vector rois = {cv::Rect(50, 50, 50, 50)};
+    static const std::vector rois = {cv::Rect(50, 50, 50, 50)};
     auto binarySensor = std::make_shared<callback::ThreadedHassHandler>(
         SimServer::GetBaseUrl(), sim_token::bearer, entityId);
     binarySensor->debounceTime = 0s;
