@@ -40,7 +40,7 @@ TEST_P(TestThreadedHassHandler, CanPostEntityUpdate) {
 
     (*binarySensor)(rois);
 
-    std::jthread watcher([&] {
+    std::jthread watcher([&, startApiCalls = startApiCalls] {
       EXPECT_EQ(startApiCalls + 2,
                 SimServer::WaitForHassApiCount(startApiCalls + 2, 10s));
     });

@@ -110,9 +110,12 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
       if (std::string_view(user.data()).empty() &&
           std::string_view(pass.data()) ==
               std::string_view(sim_token::bearer)) {
-        json responseObj;
 
-        const std::string entityIdStr(entity_id[0].buf, entity_id[0].len);
+        thread_local json responseObj;
+        responseObj.clear();
+
+        thread_local std::string entityIdStr;
+        entityIdStr = std::string(entity_id[0].buf, entity_id[0].len);
         if (entityIdStr.ends_with(".missing"sv) &&
             mg_match(hm->message, mg_str("GET"), nullptr)) {
           // special case, respond that the entity is missing, and only for GET
