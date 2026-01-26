@@ -31,7 +31,14 @@ def test_end_to_end(rtsp_server, motion_detection, resource_file):
                 on_next_line = line_utf8.endswith('"test.264"')
 
             # create the feed configuration
-            feed_config = {"main": {"sourceUrl": url}}
+            feed_config = {
+                "main": {
+                    "sourceUrl": url,
+                    "detectionSize": 10,
+                    "detectionDebounce": 1,
+                },
+                "invalid": {"sourceUrl": "rtsp://localhost:9090/invalid"},
+            }
             feed_path = Path(td) / "feeds.json"
             with open(feed_path, "w+") as fp:
                 json.dump(feed_config, fp)
@@ -39,7 +46,15 @@ def test_end_to_end(rtsp_server, motion_detection, resource_file):
 
             PORT = 8080
             modet_proc = subprocess.Popen(
-                [motion_detection, "-c", feed_path.absolute(), "-p", str(PORT)]
+                [
+                    motion_detection,
+                    "-c",
+                    feed_path.absolute(),
+                    "-p",
+                    str(PORT),
+                    "--save-destination",
+                    Path(td) / "images",
+                ]
             )
             time.sleep(2)
             res = requests.get(f"http://localhost:{PORT}")
