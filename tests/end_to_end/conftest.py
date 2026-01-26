@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 
 def pytest_addoption(parser):
@@ -9,14 +10,14 @@ def pytest_addoption(parser):
 
 @pytest.fixture
 def rtsp_server(request):
-    return request.config.option.rtsp_server
+    return Path(request.config.option.rtsp_server).absolute()
 
 
 @pytest.fixture
 def motion_detection(request):
-    return request.config.option.motion_detection
+    return Path(request.config.option.motion_detection).absolute()
 
 
 @pytest.fixture
 def resource_file(request):
-    return request.config.option.resource_file
+    return Path(request.config.option.resource_file).absolute()

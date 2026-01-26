@@ -1,1 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="5.057" timestamp="2026-01-25T16:22:49.419861-05:00" hostname="BCP-Desktop"><testcase classname="tests.end_to_end.test_end_to_end" name="test_end_to_end" time="5.047" /></testsuite></testsuites>

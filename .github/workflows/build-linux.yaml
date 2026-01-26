@@ -66,9 +66,9 @@ jobs:
       - name: End to End Test Debug-Coverage
         uses: ./.github/actions/end-to-end-test
         with:
-          motion-detection-exec: ${{ github.workspace }}/build/Debug-Coverage/MotionDetection
-          rtsp-server-exec: ${{ github.workspace }}/build/Debug-Coverage/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
-          resource-file: ${{ github.workspace }}/tests/res/test.264
+          motion-detection-exec: build/Debug-Coverage/MotionDetection
+          rtsp-server-exec: build/Debug-Coverage/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          resource-file: tests/res/test.264
 
       - name: Generate GCOV Report
         run: |
@@ -131,9 +131,9 @@ jobs:
       - name: End to End Test Release
         uses: ./.github/actions/end-to-end-test
         with:
-          motion-detection-exec: ${{ github.workspace }}/build/Release/MotionDetection
-          rtsp-server-exec: ${{ github.workspace }}/build/Release/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
-          resource-file: ${{ github.workspace }}/tests/res/test.264
+          motion-detection-exec: build/Release/MotionDetection
+          rtsp-server-exec: build/Release/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          resource-file: tests/res/test.264
 
       - name: Test Summary
         uses: test-summary/action@v2
