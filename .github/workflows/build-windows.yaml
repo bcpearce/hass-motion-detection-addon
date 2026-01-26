@@ -122,9 +122,9 @@ jobs:
       - name: End to End Test Release
         uses: ./.github/actions/end-to-end-test
         with:
-          motion-detection-exec: ${{ github.workspace }}\build\Release\MotionDetection
-          rtsp-server-exec: ${{ github.workspace }}\build\Release\vcpkg_installed\x64-windows\tools\live555\testOnDemandRTSPServer
-          resource-file: ${{ github.workspace }}\tests\res\test.264
+          motion-detection-exec: ${{ github.workspace }}/build/Release/MotionDetection
+          rtsp-server-exec: ${{ github.workspace }}/build/Release/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          resource-file: ${{ github.workspace }}/tests/res/test.264
 
       - name: Test Summary
         uses: test-summary/action@v2
