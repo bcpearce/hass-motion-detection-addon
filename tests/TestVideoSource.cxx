@@ -1,8 +1,7 @@
 #include "WindowsWrapper.h"
 
-#include <gtest/gtest.h>
-
 #include <BasicUsageEnvironment.hh>
+#include <gtest/gtest.h>
 
 #include "VideoSource/Http.h"
 #include "VideoSource/Live555.h"
@@ -11,7 +10,23 @@
 
 using namespace std::chrono_literals;
 
-TEST(HttpVideoSourceTests, TestReceiveFrame) {
+struct HttpVideoSourceTestsParams {
+  std::string token;
+  std::string username;
+  std::string password;
+};
+class HttpVideoSourceTests
+    : public testing::TestWithParam<HttpVideoSourceTestsParams> {
+  video_source::HttpVideoSource BuildSource(const boost::url &url) {
+    const auto [token, username, password] = GetParam();
+    if (!username.empty() && !password.empty()) {
+      return video_source::HttpVideoSource(url, username, password);
+    }
+    return video_source::HttpVideoSource(url, token);
+  }
+};
+
+TEST_P(HttpVideoSourceTests, TestReceiveFrame) {
   try {
     auto url = SimServer::GetBaseUrl();
     url.set_path("/api/getimage");
@@ -34,7 +49,7 @@ TEST(HttpVideoSourceTests, TestReceiveFrame) {
   }
 }
 
-TEST(HttpVideoSourceTests, TestReceiveLargeFrame) {
+TEST_P(HttpVideoSourceTests, TestReceiveLargeFrame) {
   try {
     static constexpr int width{3840};
     static constexpr int height{2160};
@@ -80,6 +95,15 @@ TEST(HttpVideoSourceTests, TestReceiveLargeFrame) {
     FAIL() << "Exception thrown: " << e.what();
   }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    Http, HttpVideoSourceTests,
+    testing::Values(HttpVideoSourceTestsParams{},
+                    HttpVideoSourceTestsParams{.token = "token"},
+                    HttpVideoSourceTestsParams{
+                        .username = "user",
+                        .password = "pass" // pragma: allowlist secret
+                    }));
 
 TEST(Live555VideoSourceTests, NoUrl) {
   auto pSched = std::shared_ptr<TaskScheduler>(BasicTaskScheduler::createNew());
