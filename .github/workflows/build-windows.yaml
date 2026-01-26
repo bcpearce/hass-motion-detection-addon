@@ -68,7 +68,7 @@ jobs:
         uses: ./.github/actions/end-to-end-test
         with:
           motion-detection-exec: build/Debug/MotionDetection
-          rtsp-server-exec: build/Debug/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          rtsp-server-exec: build/Debug/vcpkg_installed/x64-windows/tools/live555/testOnDemandRTSPServer
           resource-file: tests/res/test.264
 
   build_and_test_release:
@@ -123,7 +123,7 @@ jobs:
         uses: ./.github/actions/end-to-end-test
         with:
           motion-detection-exec: build/Release/MotionDetection
-          rtsp-server-exec: build/Release/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          rtsp-server-exec: build/Release/vcpkg_installed/x64-windows/tools/live555/testOnDemandRTSPServer
           resource-file: tests/res/test.264
 
       - name: Test Summary
