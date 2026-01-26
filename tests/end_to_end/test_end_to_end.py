@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import signal
 import time
+import requests
 
 
 def test_end_to_end(rtsp_server, motion_detection, resource_file):
@@ -36,10 +37,14 @@ def test_end_to_end(rtsp_server, motion_detection, resource_file):
                 json.dump(feed_config, fp)
                 print(f"Wrote config '{json.dumps(feed_config)}' to {feed_path}")
 
+            PORT = 8080
             modet_proc = subprocess.Popen(
-                [motion_detection, "-c", feed_path.absolute()]
+                [motion_detection, "-c", feed_path.absolute(), "-p", str(PORT)]
             )
-            time.sleep(5)
+            time.sleep(2)
+            res = requests.get(f"http://localhost:{PORT}")
+            assert res.status_code == 200
+            time.sleep(2)
             modet_proc.send_signal(signal.SIGINT)
             modet_proc.wait(10.0)
             assert modet_proc.returncode == 0

@@ -25,8 +25,10 @@ jobs:
           - arch: amd64
             os: ubuntu-24.04
             upload-coverage: true
+            triplet: x64-linux
           - arch: arm64
             os: ubuntu-24.04-arm
+            triplet: arm64-linux
 
     runs-on: ${{ matrix.os }}
     container:
@@ -67,7 +69,7 @@ jobs:
         uses: ./.github/actions/end-to-end-test
         with:
           motion-detection-exec: build/Debug-Coverage/MotionDetection
-          rtsp-server-exec: build/Debug-Coverage/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          rtsp-server-exec: build/Debug-Coverage/vcpkg_installed/${{ matrix.triplet }}/tools/live555/testOnDemandRTSPServer
           resource-file: tests/res/test.264
 
       - name: Generate GCOV Report
@@ -92,8 +94,10 @@ jobs:
         include:
           - arch: amd64
             os: ubuntu-24.04
+            triplet: x64-linux
           - arch: arm64
             os: ubuntu-24.04-arm
+            triplet: x64-linux
     runs-on: ${{ matrix.os }}
     container:
       image: bcpearce/opencv-cmake:v1-${{ matrix.arch }}
@@ -132,7 +136,7 @@ jobs:
         uses: ./.github/actions/end-to-end-test
         with:
           motion-detection-exec: build/Release/MotionDetection
-          rtsp-server-exec: build/Release/vcpkg_installed/x64-linux/tools/live555/testOnDemandRTSPServer
+          rtsp-server-exec: build/Release/vcpkg_installed/${{ matrix.triplet }}/tools/live555/testOnDemandRTSPServer
           resource-file: tests/res/test.264
 
       - name: Test Summary
