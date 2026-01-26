@@ -11,8 +11,8 @@ import requests
 
 
 def test_end_to_end(rtsp_server, motion_detection, resource_file):
-    try:
-        with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory() as td:
+        try:
             modet_proc: subprocess.Popen | None = None
             rtsp_proc: subprocess.Popen | None = None
             shutil.copy(resource_file, Path(td))
@@ -64,8 +64,10 @@ def test_end_to_end(rtsp_server, motion_detection, resource_file):
             modet_proc.wait(10.0)
             assert modet_proc.returncode == 0
 
-    finally:
-        if modet_proc is not None:
-            modet_proc.kill()
-        if rtsp_proc is not None:
-            rtsp_proc.kill()
+        finally:
+            if modet_proc is not None:
+                modet_proc.kill()
+                modet_proc.communicate()
+            if rtsp_proc is not None:
+                rtsp_proc.kill()
+                rtsp_proc.communicate()
