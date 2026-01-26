@@ -8,6 +8,7 @@ import shutil
 import signal
 import time
 import requests
+import sys
 
 
 def test_end_to_end(rtsp_server, motion_detection, resource_file):
@@ -60,7 +61,10 @@ def test_end_to_end(rtsp_server, motion_detection, resource_file):
             res = requests.get(f"http://localhost:{PORT}")
             assert res.status_code == 200
             time.sleep(2)
-            modet_proc.send_signal(signal.SIGINT)
+            if sys.platform == "win32":
+                modet_proc.send_signal(signal.CTRL_C_EVENT)
+            else:
+                modet_proc.send_signal(signal.SIGINT)
             modet_proc.wait(10.0)
             assert modet_proc.returncode == 0
 
