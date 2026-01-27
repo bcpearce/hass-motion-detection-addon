@@ -20,7 +20,11 @@ TEST(CurlWrapperTests, Smoke) {
                   &uploadData);
   EXPECT_EQ(uploadData, -1);
   // Illegal URL
-  EXPECT_THROW(yetAnotherWCurl(curl_easy_setopt, CURLOPT_URL, "notaurl"),
+  EXPECT_THROW(std::invoke([&] {
+                 yetAnotherWCurl(curl_easy_setopt, CURLOPT_TIMEOUT_MS, 500);
+                 yetAnotherWCurl(curl_easy_setopt, CURLOPT_URL, "notaurl");
+                 yetAnotherWCurl(curl_easy_perform);
+               }),
                util::CurlWrapper::CurlError);
   EXPECT_NO_THROW(curl_easy_reset(&yetAnotherWCurl));
 }
