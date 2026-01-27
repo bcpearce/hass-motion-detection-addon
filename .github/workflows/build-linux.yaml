@@ -65,13 +65,6 @@ jobs:
         working-directory: build/Debug-Coverage
         run: ctest --output-junit test_detail_debug.xml --output-on-failure
 
-      - name: End to End Test Debug-Coverage
-        uses: ./.github/actions/end-to-end-test
-        with:
-          motion-detection-exec: build/Debug-Coverage/MotionDetection
-          rtsp-server-exec: build/Debug-Coverage/vcpkg_installed/${{ matrix.triplet }}/tools/live555/testOnDemandRTSPServer
-          resource-file: tests/res/test.264
-
       - name: Generate GCOV Report
         run: |
           apt-get update && apt-get install gcovr -y
@@ -131,13 +124,6 @@ jobs:
       - name: Test Release
         working-directory: build/Release
         run: ctest --output-junit test_detail_integration_release.xml --output-on-failure
-
-      - name: End to End Test Release
-        uses: ./.github/actions/end-to-end-test
-        with:
-          motion-detection-exec: build/Release/MotionDetection
-          rtsp-server-exec: build/Release/vcpkg_installed/${{ matrix.triplet }}/tools/live555/testOnDemandRTSPServer
-          resource-file: tests/res/test.264
 
       - name: Test Summary
         uses: test-summary/action@v2

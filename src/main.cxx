@@ -50,25 +50,9 @@ struct SourceAndHandlers {
 
 static ExitSignalHandler exitSignalHandler;
 
-#ifdef _WIN32
-BOOL WINAPI SignalHandlerWrapper(DWORD dwCtrlType) {
-  switch (dwCtrlType) {
-  case CTRL_C_EVENT:
-  case CTRL_BREAK_EVENT:
-    exitSignalHandler(SIGINT);
-    return TRUE;
-  case CTRL_CLOSE_EVENT:
-    exitSignalHandler(SIGTERM);
-    return TRUE;
-  default:
-    return FALSE;
-  }
-}
-#elifdef __linux__
 void SignalHandlerWrapper(int signal) {
   exitSignalHandler(signal); // Call the functor's operator()
 }
-#endif
 
 } // namespace
 
@@ -202,12 +186,8 @@ void App(const util::ProgramOptions &opts) {
     }
   }
 
-#ifdef _WIN32
-  SetConsoleCtrlHandler(SignalHandlerWrapper, TRUE);
-#elifdef __linux__
   std::signal(SIGINT, SignalHandlerWrapper);
   std::signal(SIGTERM, SignalHandlerWrapper);
-#endif
   for (auto pSource :
        sources | std::views::transform(&SourceAndHandlers::pSource)) {
     if (pSource) {

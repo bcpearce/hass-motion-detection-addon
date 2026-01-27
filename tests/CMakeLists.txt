@@ -40,10 +40,10 @@ target_compile_definitions(${UNIT_TEST_PROJECT}
 include(GoogleTest)
 gtest_discover_tests(${UNIT_TEST_PROJECT} TEST_LIST UNIT_TESTS)
 
-add_executable(Live555_IntegrationTest Live555_IntegrationTest.cxx LogEnv.h)
+add_executable(TestIntegration TestIntegration.cxx LogEnv.h)
 find_package(Boost REQUIRED COMPONENTS asio process)
 target_link_libraries(
-  Live555_IntegrationTest
+  TestIntegration
   PRIVATE Boost::asio
           Boost::process
           Callback
@@ -56,16 +56,28 @@ target_link_libraries(
           GTest::gtest)
 
 add_custom_command(
-  TARGET Live555_IntegrationTest
+  TARGET TestIntegration
   POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/res/test.264"
-          "$<TARGET_FILE_DIR:Live555_IntegrationTest>/test.264"
+          "$<TARGET_FILE_DIR:TestIntegration>/test.264"
   COMMENT "Copying Live555 Integration test data")
+
 add_test(
-  NAME Live555_IntegrationTest.H264
-  COMMAND $<TARGET_FILE:Live555_IntegrationTest> --duration=10
-          --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>
-  WORKING_DIRECTORY $<TARGET_FILE_DIR:Live555_IntegrationTest>)
+  NAME TestIntegration.Live555VideoSourceTest
+  COMMAND
+    $<TARGET_FILE:TestIntegration> --duration=5
+    --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>
+    --gtest_filter=*.Live555VideoSourceTest
+  WORKING_DIRECTORY $<TARGET_FILE_DIR:TestIntegration>)
+
+add_test(
+  NAME TestIntegration.EndToEnd
+  COMMAND
+    $<TARGET_FILE:TestIntegration> --duration=5
+    --rtspServerExec=$<TARGET_FILE:Live555::testOnDemandRTSPServer>
+    --motionDetectionExec=$<TARGET_FILE:MotionDetection>
+    --gtest_filter=*.EndToEnd
+  WORKING_DIRECTORY $<TARGET_FILE_DIR:TestIntegration>)
 
 add_test(NAME MotionDetection.CliHelp COMMAND MotionDetection --help)
 add_test(NAME MotionDetection.CliVersion COMMAND MotionDetection --version)
