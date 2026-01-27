@@ -12,3 +12,6 @@ Testing/
 .vscode/launch.json
 *.log
 node_modules/
+*__pycache__*
+*.egg-info/
+*test_detail*.xml

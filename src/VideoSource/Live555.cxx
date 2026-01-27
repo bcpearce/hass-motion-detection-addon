@@ -16,8 +16,7 @@
 using namespace std::string_view_literals;
 
 namespace {
-[[nodiscard]] std::string MakeDecoderError(DECODING_STATE state,
-                                           unsigned int errMask) {
+[[nodiscard]] std::string MakeDecoderError(DECODING_STATE state, unsigned int) {
   thread_local std::vector<std::string_view> errors;
   errors.clear();
   if (state & dsFramePending) {
@@ -216,8 +215,7 @@ private:
   }
 
   void AfterGettingFrame(unsigned int frameSize, unsigned int numTruncatedBytes,
-                         timeval presentationTime,
-                         unsigned int durationInMicroseconds) {
+                         timeval presentationTime, unsigned int) {
 #ifdef _DEBUG
     const std::string truncatedMsg =
         (numTruncatedBytes > 0)
@@ -336,7 +334,7 @@ void Live555VideoSource::StartStream(unsigned long long maxFrames) {
 void Live555VideoSource::StopStream() { StopStream_Impl(); }
 
 void Live555VideoSource::SetYUVFrame(uint8_t **pDataYUV, int width, int height,
-                                     int strideY, int strideUV, int timeStamp) {
+                                     int strideY, int strideUV, int) {
 
   thread_local cv::Mat Y, U, V, YUV;
   Y = cv::Mat(cv::Size(width, height), CV_8UC1, pDataYUV[0],
@@ -621,7 +619,6 @@ void subsessionAfterPlaying(void *clientData) {
 void subsessionByeHandler(void *clientData, const char *reason) {
   MediaSubsession *subsession = (MediaSubsession *)clientData;
   RTSPClient *rtspClient = (RTSPClient *)subsession->miscPtr;
-  UsageEnvironment &env = rtspClient->envir(); // alias
 
   if (reason) {
     LOGGER->warn(
@@ -661,8 +658,7 @@ void shutdownStream(RTSPClient *rtspClient) {
     return;
   }
   auto *frameRtspClient = dynamic_cast<FrameRtspClient *>(rtspClient);
-  UsageEnvironment &env = frameRtspClient->envir(); // alias
-  StreamClientState &scs = frameRtspClient->scs;    // alias
+  StreamClientState &scs = frameRtspClient->scs; // alias
 
   // First, check whether any subsessions have still to be closed:
   if (scs.session != nullptr) {

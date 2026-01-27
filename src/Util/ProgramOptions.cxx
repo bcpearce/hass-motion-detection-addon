@@ -39,6 +39,13 @@ ProgramOptions::ParseOptions(int argc, const char **argv) {
       /**/
       ("source-config,c", po::value<std::filesystem::path>(),
        "Path to source Config File");
+
+  /*
+   * Source RTSP Feed Options
+   */
+  sourceFeedOptions.add_options()
+      /**/
+      ("source-config-raw", po::value<std::string>(), "Raw config JSON string");
   allOptions.add(sourceFeedOptions);
 
   /*
@@ -111,8 +118,16 @@ ProgramOptions::ParseOptions(int argc, const char **argv) {
   try {
     po::notify(vm);
 
-    options.feeds =
-        FeedOptions::ParseJson(vm["source-config"].as<std::filesystem::path>());
+    if (!vm["source-config"].empty() && !vm["source-config-raw"].empty()) {
+      throw std::invalid_argument(
+          "Must specify only one of 'source-config' or 'source-config-raw'");
+    } else if (!vm["source-config-raw"].empty()) {
+      const auto sourceConfigRaw = vm["source-config-raw"].as<std::string>();
+      options.feeds = FeedOptions::ParseJson(std::string_view(sourceConfigRaw));
+    } else {
+      options.feeds = FeedOptions::ParseJson(
+          vm["source-config"].as<std::filesystem::path>());
+    }
 
     options.hassUrl = boost::url(vm["hass-url"].as<std::string>());
     options.hassToken = vm["hass-token"].as<std::string>();

@@ -13,7 +13,9 @@
 #include <boost/bind/bind.hpp>
 #include <boost/process.hpp>
 #include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <openssl/sha.h>
 #include <regex>
 
@@ -24,10 +26,12 @@ using namespace std::string_literals;
 using namespace std::string_view_literals;
 namespace bp2 = boost::process::v2;
 namespace asio = boost::asio;
+using json = nlohmann::json;
 
 struct Args {
   std::chrono::seconds duration{10};
   std::filesystem::path rtspServerExec;
+  std::filesystem::path motionDetectionExec;
 };
 Args args;
 
@@ -41,10 +45,46 @@ void StopStream(void *clientData) {
   source.StopStream();
 }
 
-class Live555VideoSourceTests : public testing::Test {
+class RTSPServerFixture : public testing::Test {
 public:
-  Live555VideoSourceTests() : stderrCap_{ioCtx_} {
+  RTSPServerFixture() : stderrCap_{ioCtx_} {
     resourcePath_ = std::filesystem::current_path() / resourceFile;
+  }
+
+  void SetUp() override {
+    ASSERT_TRUE(
+        std::filesystem::exists(std::filesystem::current_path() / resourceFile))
+        << "Expected to find resource file " << resourceFile
+        << "in working directory";
+    ASSERT_TRUE(std::filesystem::is_regular_file(
+        std::filesystem::current_path() / resourceFile))
+        << "Expected to find resource file 'test.264' in working directory";
+    rtspServerProc_ = bp2::process(
+        ioCtx_, args.rtspServerExec, {}, bp2::process_stdio{{}, {}, stderrCap_},
+        bp2::process_start_dir{std::filesystem::current_path()});
+
+    timer_ = decltype(timer_)(ioCtx_);
+    timer_->expires_after(args.duration * 2);
+    timer_->async_wait([this](const boost::system::error_code &ec) {
+      if (!ec) {
+        LOGGER->info("Timeout in ioCtx");
+        didTimeout_ = true;
+        FAIL() << "Timeout occurred during test";
+      } else {
+        FAIL() << "Something went wrong " << ec.what();
+      }
+    });
+
+    doRead();
+    while (rtspServerUrl_.empty() && !didTimeout_) {
+      ioCtx_.run_one();
+    }
+    ASSERT_FALSE(didTimeout_)
+        << "Timeout occurred setting up RTSP Server Process";
+  }
+
+  void TearDown() override {
+    EXPECT_FALSE(didTimeout_) << "Timeout occurred during test.";
   }
 
 protected:
@@ -53,11 +93,11 @@ protected:
   void doRead() {
     asio::async_read_until(
         stderrCap_, streamBuf_, "\n",
-        boost::bind(&Live555VideoSourceTests::handleLine, this,
+        boost::bind(&RTSPServerFixture::handleLine, this,
                     boost::asio::placeholders::error,
                     boost::asio::placeholders::bytes_transferred));
   }
-  void handleLine(const boost::system::error_code &ec, size_t n) {
+  void handleLine(const boost::system::error_code &ec, size_t) {
     if (!ec) {
       std::istream is(&streamBuf_);
       std::string line;
@@ -83,53 +123,25 @@ protected:
       LOGGER->error("[RTSP SERVER] an error occurred {}", ec.what());
     }
   }
+
   std::filesystem::path resourcePath_;
   asio::io_context ioCtx_;
   asio::streambuf streamBuf_;
   asio::readable_pipe stderrCap_;
+  std::optional<asio::steady_timer> timer_;
+  std::optional<bp2::process> rtspServerProc_;
 
   bool captureUrl_{false};
   boost::url rtspServerUrl_;
+  bool didTimeout_{false};
 };
 
-TEST_F(Live555VideoSourceTests, Smoke) {
-  ASSERT_TRUE(
-      std::filesystem::exists(std::filesystem::current_path() / resourceFile))
-      << "Expected to find resource file " << resourceFile
-      << "in working directory";
-  ASSERT_TRUE(std::filesystem::is_regular_file(std::filesystem::current_path() /
-                                               resourceFile))
-      << "Expected to find resource file 'test.264' in working directory";
-  bp2::async_execute(bp2::process(
-      ioCtx_, args.rtspServerExec, {}, bp2::process_stdio{{}, {}, stderrCap_},
-      bp2::process_start_dir{std::filesystem::current_path()}))(
-      asio::cancel_after(args.duration, asio::cancellation_type::partial))(
-      asio::cancel_after(args.duration, asio::cancellation_type::terminal))(
-      asio::detached);
-
-  bool didTimeout{false};
-  asio::steady_timer timer(ioCtx_);
-  timer.expires_after(args.duration);
-  timer.async_wait([&didTimeout](const boost::system::error_code &ec) {
-    if (!ec) {
-      LOGGER->info("Timeout in ioCtx");
-    } else {
-      LOGGER->error("Timer error {}", ec.what());
-    }
-    didTimeout = true;
-  });
-
-  doRead();
-  while (rtspServerUrl_.empty() && !didTimeout) {
-    ioCtx_.run_one();
-  }
-
+TEST_F(RTSPServerFixture, Live555VideoSourceTest) {
   auto pSched = std::shared_ptr<TaskScheduler>(BasicTaskScheduler::createNew());
   auto pSource = std::make_shared<video_source::Live555VideoSource>(
       pSched, rtspServerUrl_);
 
   // Install a restart watcher
-  bool didUpdateListener{false};
   struct Callback {
     bool didUpdateListener{false};
     void operator()(int) { didUpdateListener = true; }
@@ -145,15 +157,15 @@ TEST_F(Live555VideoSourceTests, Smoke) {
   asio::post(ioCtx_, [&] {
     pSource->StartStream();
     pSched->scheduleDelayedTask(
-        std::chrono::microseconds(args.duration).count(), StopStream,
+        std::chrono::microseconds(args.duration / 2).count(), StopStream,
         pSource.get());
     pSched->scheduleDelayedTask(
-        std::chrono::microseconds(args.duration).count() * 2, StopEventLoop,
+        std::chrono::microseconds(args.duration * 3 / 4).count(), StopEventLoop,
         &wv);
     pSched->doEventLoop(&wv);
   });
 
-  ioCtx_.run();
+  ioCtx_.run_for(args.duration);
   EXPECT_GT(pSource->GetFrameCount(), 0);
   EXPECT_TRUE(spCallback->didUpdateListener);
   EXPECT_GT(watcher.GetRestartAttempts(), 0);
@@ -162,6 +174,24 @@ TEST_F(Live555VideoSourceTests, Smoke) {
   RecordProperty("Frame Count", pSource->GetFrameCount());
   RecordProperty("Restart Attempts", watcher.GetRestartAttempts());
   RecordProperty("Null Payload Updates", watcher.GetNullPayloadUpdates());
+}
+
+TEST_F(RTSPServerFixture, EndToEnd) {
+  const auto config = std::invoke([this] {
+    json config;
+    config["main"]["sourceUrl"] = rtspServerUrl_.c_str();
+    config["main"]["detectionSize"] = 10;
+    config["main"]["detectionDebounce"] = 1;
+    config["invalid"]["sourceUrl"] = "rtsp://localhost:9090/invalid";
+    return config;
+  });
+
+  bp2::process motionDetectionProc(
+      ioCtx_, args.motionDetectionExec, {"--source-config-raw", config.dump()},
+      bp2::process_start_dir{std::filesystem::current_path()});
+  ioCtx_.run_for(args.duration);
+  motionDetectionProc.request_exit();
+  ASSERT_EQ(EXIT_SUCCESS, motionDetectionProc.wait());
 }
 
 int main(int argc, char **argv) {
@@ -177,6 +207,8 @@ int main(int argc, char **argv) {
             std::min(10s, std::chrono::seconds{std::stoi(std::string(value))});
       } else if (prefix == "--rtspServerExec") {
         args.rtspServerExec = std::filesystem::path(value);
+      } else if (prefix == "--motionDetectionExec") {
+        args.motionDetectionExec = std::filesystem::path(value);
       }
     }
   }

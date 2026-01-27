@@ -11,7 +11,7 @@ namespace {
 static std::once_flag curlGlobalFlag;
 
 #if defined(_DEBUG)
-int curlDebugCallback(CURL *handle, curl_infotype type, char *data, size_t sz,
+int curlDebugCallback(CURL *, curl_infotype type, char *data, size_t sz,
                       void *) {
   switch (type) {
   case CURLINFO_TEXT: {

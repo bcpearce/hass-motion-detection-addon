@@ -30,20 +30,28 @@ TEST_P(TestThreadedHassHandler, CanPostEntityUpdate) {
   const int startApiCalls = SimServer::GetHassApiCount();
   const std::string entityId{GetParam()};
   {
+    static const std::vector rois = {cv::Rect(50, 50, 50, 50)};
     auto binarySensor = std::make_shared<callback::ThreadedHassHandler>(
         SimServer::GetBaseUrl(), sim_token::bearer, entityId);
     binarySensor->debounceTime = 0s;
     binarySensor->Start();
 
-    (*binarySensor)({});
-    std::vector rois = {cv::Rect(50, 50, 50, 50)};
+    {
+      std::jthread watcher([&, startApiCalls = startApiCalls] {
+        EXPECT_EQ(startApiCalls + 1,
+                  SimServer::WaitForHassApiCount(startApiCalls + 1, 3s));
+      });
 
-    (*binarySensor)(rois);
+      (*binarySensor)({});
+    }
+    {
+      std::jthread watcher([&, startApiCalls = startApiCalls] {
+        EXPECT_EQ(startApiCalls + 2,
+                  SimServer::WaitForHassApiCount(startApiCalls + 2, 3s));
+      });
 
-    std::jthread watcher([&] {
-      EXPECT_EQ(startApiCalls + 2,
-                SimServer::WaitForHassApiCount(startApiCalls + 2, 10s));
-    });
+      (*binarySensor)(rois);
+    }
   }
 }
 
@@ -80,6 +88,7 @@ TEST_P(TestAsyncHassHandler, CanPostEntityUpdate) {
   const int startApiCalls = SimServer::GetHassApiCount();
   const std::string entityId{GetParam()};
   {
+    std::vector rois = {cv::Rect(50, 50, 50, 50)};
     EventLoopWatchVariable wv{0};
     std::barrier sync(2);
 
@@ -87,8 +96,6 @@ TEST_P(TestAsyncHassHandler, CanPostEntityUpdate) {
         pSched_, SimServer::GetBaseUrl(), sim_token::bearer, entityId);
     binarySensor->debounceTime = 0s;
     binarySensor->Register();
-
-    std::vector rois = {cv::Rect(50, 50, 50, 50)};
 
     (*binarySensor)(rois);
 

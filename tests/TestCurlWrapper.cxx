@@ -19,6 +19,13 @@ TEST(CurlWrapperTests, Smoke) {
   yetAnotherWCurl(curl_easy_getinfo, CURLINFO_CONTENT_LENGTH_UPLOAD_T,
                   &uploadData);
   EXPECT_EQ(uploadData, -1);
+  // Illegal URL
+  EXPECT_THROW(std::invoke([&] {
+                 yetAnotherWCurl(curl_easy_setopt, CURLOPT_TIMEOUT_MS, 500);
+                 yetAnotherWCurl(curl_easy_setopt, CURLOPT_URL, "notaurl");
+                 yetAnotherWCurl(curl_easy_perform);
+               }),
+               util::CurlWrapper::CurlError);
   EXPECT_NO_THROW(curl_easy_reset(&yetAnotherWCurl));
 }
 
@@ -31,6 +38,9 @@ TEST(CurlMultiWrapperTests, Smoke) {
 
   CURL **handles = curl_multi_get_handles(yetAnotherWCurlMulti.pCurl_);
   EXPECT_EQ(handles[0], nullptr);
+  int nHandles{0};
+  EXPECT_THROW(yetAnotherWCurlMulti(curl_multi_remove_handle, nullptr),
+               util::CurlMultiWrapper::CurlMultiError);
   curl_free(handles);
 }
 

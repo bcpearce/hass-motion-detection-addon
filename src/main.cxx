@@ -56,8 +56,6 @@ void SignalHandlerWrapper(int signal) {
 
 } // namespace
 
-void EventLoopSignalHandler(int signal) {}
-
 void App(const util::ProgramOptions &opts) {
 
   std::shared_ptr<TaskScheduler> pSched =
