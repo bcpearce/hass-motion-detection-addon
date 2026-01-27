@@ -202,9 +202,6 @@ void WebHandler::Start() {
   sync.arrive_and_wait();
   auto pWebsocketSink = std::make_shared<spdlog::sinks::callback_sink_mt>(
       [this](const spdlog::details::log_msg &msg) {
-        const auto levelSv =
-            std::string_view(spdlog::level::to_string_view(msg.level));
-        const auto msgSv = std::string_view(msg.payload);
         thread_local json wsMsg = {};
         thread_local std::string dumped;
 

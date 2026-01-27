@@ -83,7 +83,7 @@ public:
         << "Timeout occurred setting up RTSP Server Process";
   }
 
-  void TearDown() {
+  void TearDown() override {
     EXPECT_FALSE(didTimeout_) << "Timeout occurred during test.";
   }
 
@@ -97,7 +97,7 @@ protected:
                     boost::asio::placeholders::error,
                     boost::asio::placeholders::bytes_transferred));
   }
-  void handleLine(const boost::system::error_code &ec, size_t n) {
+  void handleLine(const boost::system::error_code &ec, size_t) {
     if (!ec) {
       std::istream is(&streamBuf_);
       std::string line;
@@ -142,7 +142,6 @@ TEST_F(RTSPServerFixture, Live555VideoSourceTest) {
       pSched, rtspServerUrl_);
 
   // Install a restart watcher
-  bool didUpdateListener{false};
   struct Callback {
     bool didUpdateListener{false};
     void operator()(int) { didUpdateListener = true; }
