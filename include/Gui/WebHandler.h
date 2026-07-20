@@ -62,9 +62,8 @@ private:
     BroadcastImageData modelBroadcastData_;
 
     explicit FeedImageData(mg_mgr *mgr)
-        : imageBroadcastData_{.mgr = mgr,
-                              .mtx = &modelMtx_,
-                              .marker = {'L', char(-1)}},
+        : imageBroadcastData_{
+              .mgr = mgr, .mtx = &modelMtx_, .marker = {'L', char(-1)}},
           modelBroadcastData_{
               .mgr = mgr, .mtx = &imageMtx_, .marker = {'M', char(-1)}} {}
   };
