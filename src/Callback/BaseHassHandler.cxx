@@ -54,7 +54,7 @@ void BaseHassHandler::UpdateBinarySensor(
             return r.size() > 0 ? std::optional{"on"s} : std::optional{"off"s};
           })
           .value_or("unknown"s);
-  thread_local json attributes;
+  json attributes;
   attributes["device_class"] = "motion";
   for (const auto &roi : rois.value_or(detector::RegionsOfInterest{})) {
     json roiJson;

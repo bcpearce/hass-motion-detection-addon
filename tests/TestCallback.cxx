@@ -99,11 +99,11 @@ TEST_P(TestAsyncHassHandler, CanPostEntityUpdate) {
 
     (*binarySensor)(rois);
 
-    const auto trigger = pSched_->createEventTrigger(EndLoop);
     pSched_->scheduleDelayedTask(50'000, Kickoff, &sync);
 
     std::jthread driver([&] {
       sync.arrive_and_wait();
+      const auto trigger = pSched_->createEventTrigger(EndLoop);
 
       EXPECT_EQ(startApiCalls + 1,
                 SimServer::WaitForHassApiCount(startApiCalls + 1, 10s));
