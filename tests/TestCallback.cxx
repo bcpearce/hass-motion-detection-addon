@@ -24,20 +24,25 @@ using namespace std::chrono_literals;
 using namespace std::string_view_literals;
 
 class TestThreadedHassHandler
-    : public testing::TestWithParam<std::string_view> {};
+    : public testing::TestWithParam<std::string_view> {
+public:
+  void SetUp() override { rois_ = {cv::Rect(50, 50, 50, 50)}; };
+
+protected:
+  std::vector<cv::Rect> rois_;
+};
 
 TEST_P(TestThreadedHassHandler, CanPostEntityUpdate) {
   const int startApiCalls = SimServer::GetHassApiCount();
   const std::string entityId{GetParam()};
   {
-    static const std::vector rois = {cv::Rect(50, 50, 50, 50)};
     auto binarySensor = std::make_shared<callback::ThreadedHassHandler>(
         SimServer::GetBaseUrl(), sim_token::bearer, entityId);
     binarySensor->debounceTime = 0s;
     binarySensor->Start();
 
     {
-      std::jthread watcher([&, startApiCalls = startApiCalls] {
+      std::jthread watcher([startApiCalls = startApiCalls] {
         EXPECT_EQ(startApiCalls + 1,
                   SimServer::WaitForHassApiCount(startApiCalls + 1, 3s));
       });
@@ -45,12 +50,12 @@ TEST_P(TestThreadedHassHandler, CanPostEntityUpdate) {
       (*binarySensor)({});
     }
     {
-      std::jthread watcher([&, startApiCalls = startApiCalls] {
+      std::jthread watcher([startApiCalls = startApiCalls] {
         EXPECT_EQ(startApiCalls + 2,
                   SimServer::WaitForHassApiCount(startApiCalls + 2, 3s));
       });
 
-      (*binarySensor)(rois);
+      (*binarySensor)(rois_);
     }
   }
 }
