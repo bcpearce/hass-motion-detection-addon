@@ -13,6 +13,7 @@ env:
   VCPKG_GIT_REF: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
   FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
+  CLANG_VERSION: "21.1.8"
 
 jobs:
   build_and_test_debug:
@@ -23,8 +24,8 @@ jobs:
         with:
           submodules: true
           lfs: true
-      - name: Install LLVM (Clang) 21
-        run: choco install llvm --version=21.1.8 --allow-downgrade
+      - name: Install LLVM (Clang ${{ env.CLANG_VERSION }})
+        run: choco install llvm --version=${{ env.CLANG_VERSION }} --allow-downgrade
 
       - name: Get VCPKG
         run: |
@@ -71,8 +72,8 @@ jobs:
         with:
           submodules: true
           lfs: true
-      - name: Install LLVM (Clang) 19
-        run: choco install llvm --version=19.1.5 --allow-downgrade
+      - name: Install LLVM (Clang ${{ env.CLANG_VERSION }})
+        run: choco install llvm --version=${{ env.CLANG_VERSION }} --allow-downgrade
 
       - name: Get VCPKG
         run: |
