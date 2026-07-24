@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v21.1.8
+    rev: v22.1.8
     hooks:
       - id: clang-format
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -13,7 +13,7 @@ repos:
         args: ["--autofix", "--indent=2", "--top-keys=name"]
       - id: trailing-whitespace
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.3
     hooks:
       - id: codespell
         args: ["-I", ".codespellignore"]
@@ -24,7 +24,7 @@ repos:
         args: ["--baseline", ".secrets.baseline"]
         exclude: vcpkg.json
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.10
+    rev: v1.7.12
     hooks:
       - id: actionlint
   - repo: local

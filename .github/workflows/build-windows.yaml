@@ -15,7 +15,6 @@ env:
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
 
 jobs:
-
   build_and_test_debug:
     name: Build and Test (Windows/Debug)
     runs-on: windows-latest
@@ -24,13 +23,13 @@ jobs:
         with:
           submodules: true
           lfs: true
-      - name: Install LLVM (Clang) 19
-        run: choco install llvm --version=19.1.5 --allow-downgrade
+      - name: Install LLVM (Clang) 21
+        run: choco install llvm --version=21.1.8 --allow-downgrade
 
       - name: Get VCPKG
         run: |
-            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+          git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+          cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
 
       - name: Bootstrap vcpkg
         shell: pwsh
@@ -77,8 +76,8 @@ jobs:
 
       - name: Get VCPKG
         run: |
-            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+          git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+          cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
 
       - name: Bootstrap vcpkg
         shell: pwsh

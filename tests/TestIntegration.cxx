@@ -60,8 +60,11 @@ public:
         std::filesystem::current_path() / resourceFile))
         << "Expected to find resource file 'test.264' in working directory";
     rtspServerProc_ = bp2::process(
-        ioCtx_, args.rtspServerExec, {}, bp2::process_stdio{{}, {}, stderrCap_},
-        bp2::process_start_dir{std::filesystem::current_path()});
+        ioCtx_.get_executor(),
+        boost::filesystem::path{args.rtspServerExec.string()},
+        std::vector<std::string>{}, bp2::process_stdio{{}, {}, stderrCap_},
+        bp2::process_start_dir{
+            boost::filesystem::path{std::filesystem::current_path().string()}});
 
     timer_ = decltype(timer_)(ioCtx_);
     timer_->expires_after(args.duration * 2);
@@ -187,8 +190,11 @@ TEST_F(RTSPServerFixture, EndToEnd) {
   });
 
   bp2::process motionDetectionProc(
-      ioCtx_, args.motionDetectionExec, {"--source-config-raw", config.dump()},
-      bp2::process_start_dir{std::filesystem::current_path()});
+      ioCtx_.get_executor(),
+      boost::filesystem::path{args.motionDetectionExec.string()},
+      std::vector<std::string>{"--source-config-raw"s, config.dump()},
+      bp2::process_start_dir{
+          boost::filesystem::path{std::filesystem::current_path().string()}});
   ioCtx_.run_for(args.duration);
   motionDetectionProc.request_exit();
   ASSERT_EQ(EXIT_SUCCESS, motionDetectionProc.wait());
