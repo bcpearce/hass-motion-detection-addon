@@ -12,17 +12,20 @@ host_network: true
 homeassistant_api: true
 icon: mdi:motion-sensor
 options:
-  url:
+  feeds: []
+  url: ""
   entity_id: "binary_sensor.motion_detected"
 
 schema:
-  url: url
-  username: str?
-  password: password? #pragma: allowlist secret
-  token: password?
-  entity_id: str
-  detection_debounce_seconds: int(,3600)?
-  detection_size: str?
+  feeds:
+  - name: str?
+    url: url?
+    entity_id: str?
+    username: str?
+    password: password?   #pragma: allowlist secret
+    token: password?
+    detection_debounce_seconds: int(,3600)?
+    detection_size: str?
 
 environment:
   HASS_URL: http://supervisor
