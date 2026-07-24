@@ -101,7 +101,7 @@ TEST_P(TestAsyncHassHandler, CanPostEntityUpdate) {
 
     pSched_->scheduleDelayedTask(50'000, Kickoff, &sync);
 
-    std::jthread driver([&] {
+    std::jthread driver([this, &sync, &wv, startApiCalls] {
       sync.arrive_and_wait();
       const auto trigger = pSched_->createEventTrigger(EndLoop);
 
