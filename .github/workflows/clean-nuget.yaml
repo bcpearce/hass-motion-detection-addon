@@ -7,16 +7,17 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                triplet: [x64-linux, x64-windows, arm64-linux]
                 package:
                     - opencv4
                     - live555
                     - openh264
+                triplet: [x64-linux, x64-windows, arm64-linux]
         steps:
             - name: Delete old cached nuget packages
               uses: actions/delete-package-versions@v5
+              continue-on-error: true
               with:
-                  package-name: "${{ matrix.package}}_${{ matrix.triplet }}"
+                  package-name: "${{ matrix.package }}_${{ matrix.triplet }}"
                   package-type: nuget
                   min-versions-to-keep: 1
               env:
