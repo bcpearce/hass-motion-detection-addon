@@ -42,5 +42,11 @@
       ],
       "description": "Build tests."
     }
-  }
+  },
+  "overrides": [
+    {
+      "name": "mongoose",
+      "version": "7.19"
+    }
+  ]
 }

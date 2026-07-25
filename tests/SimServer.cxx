@@ -90,10 +90,9 @@ void SimServer::ev_handler(struct mg_connection *c, int ev, void *ev_data) {
       mg_printf(c,
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Type: image/jpeg\r\n"
-                "Content-Length: %ull\r\n\r\n",
-                jpgBuf.size());
+                "Content-Length: %llu\r\n\r\n",
+                static_cast<unsigned long long>(jpgBuf.size()));
       mg_send(c, jpgBuf.data(), jpgBuf.size());
-      mg_send(c, "\r\n", 2);
     } else if (mg_match(hm->uri, mg_str("/api/hello"), nullptr)) {
       mg_http_reply(c, 200, "", "Hello There");
     } else if (mg_str entity_id[2];

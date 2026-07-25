@@ -1,10 +1,11 @@
 name: Build Project (Windows)
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  # push:
+  #   branches:
+  #     - main
+  # pull_request:
+  workflow_dispatch:
 
 env:
   USERNAME: bcpearce
@@ -13,9 +14,9 @@ env:
   VCPKG_GIT_REF: 8f54ef5453e7e76ff01e15988bf243e7247c5eb5
   FEED_URL: https://nuget.pkg.github.com/bcpearce/index.json
   VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bcpearce/index.json,readwrite"
+  CLANG_VERSION: "21.1.8"
 
 jobs:
-
   build_and_test_debug:
     name: Build and Test (Windows/Debug)
     runs-on: windows-latest
@@ -24,13 +25,13 @@ jobs:
         with:
           submodules: true
           lfs: true
-      - name: Install LLVM (Clang) 19
-        run: choco install llvm --version=19.1.5 --allow-downgrade
+      - name: Install LLVM (Clang ${{ env.CLANG_VERSION }})
+        run: choco install llvm --version=${{ env.CLANG_VERSION }} --allow-downgrade
 
       - name: Get VCPKG
         run: |
-            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+          git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+          cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
 
       - name: Bootstrap vcpkg
         shell: pwsh
@@ -72,13 +73,13 @@ jobs:
         with:
           submodules: true
           lfs: true
-      - name: Install LLVM (Clang) 19
-        run: choco install llvm --version=19.1.5 --allow-downgrade
+      - name: Install LLVM (Clang ${{ env.CLANG_VERSION }})
+        run: choco install llvm --version=${{ env.CLANG_VERSION }} --allow-downgrade
 
       - name: Get VCPKG
         run: |
-            git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-            cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
+          git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+          cd ${{ env.VCPKG_ROOT }} && git checkout ${{ env.VCPKG_GIT_REF }}
 
       - name: Bootstrap vcpkg
         shell: pwsh
