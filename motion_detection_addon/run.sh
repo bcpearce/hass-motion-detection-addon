@@ -6,7 +6,7 @@ set -e
 declare -a args=("$@")
 args+=(--hass-url 'http://supervisor')
 args+=(--hass-token "$SUPERVISOR_TOKEN")
-RAWCONF=$(/data/options.json | jq '.feeds | map({(.name): .}) | add')
+RAWCONF=$(cat /data/options.json | jq '.feeds | map({(.name): .}) | add')
 args+=(--source-config-raw $RAWCONF)
 
 echo "MotionDetection version $(MotionDetection --version)"
