@@ -44,3 +44,5 @@ repos:
     hooks:
       - id: prettier
         types_or: [css]
+
+ci: {}
