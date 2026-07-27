@@ -1,3 +1,6 @@
+name: Clean Nuget
+description: Cleanup outdated packages stored for caching
+
 on:
     workflow_dispatch:
     push:
