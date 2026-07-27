@@ -75,7 +75,7 @@ WORKDIR /
 ENTRYPOINT ["/init"]
 
 RUN curl -L --output motion-detection.deb \
-    "https://github.com/bcpearce/hass-motion-detection-addon/releases/download/v${VERSION}/motion-detection-${BUILD_ARCH}.deb"
+    "https://github.com/bcpearce/hass-motion-detection-addon/releases/download/v${MOTION_DETECTION_VERSION}/motion-detection-${BUILD_ARCH}.deb"
 
 RUN apt-get install ./*.deb -y
 
