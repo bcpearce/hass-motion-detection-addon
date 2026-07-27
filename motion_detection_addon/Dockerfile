@@ -23,6 +23,7 @@ ARG \
 # Base system
 WORKDIR /usr/src
 ARG BUILD_ARCH
+ARG MOTION_DETECTION_VERSION=0.7.2
 
 RUN \
     set -x \
@@ -74,13 +75,12 @@ WORKDIR /
 ENTRYPOINT ["/init"]
 
 RUN curl -L --output motion-detection.deb \
-    "https://github.com/bcpearce/hass-motion-detection-addon/releases/latest/download/motion-detection-${BUILD_ARCH}.deb"
+    "https://github.com/bcpearce/hass-motion-detection-addon/releases/download/v${VERSION}/motion-detection-${BUILD_ARCH}.deb"
 
 RUN apt-get install ./*.deb -y
 
 
 COPY run.sh /run.sh
-COPY build_feed_config.py /build_feed_config.py
-RUN chmod a+x /run.sh /build_feed_config.py
+RUN chmod a+x /run.sh
 
 CMD [ "/run.sh" ]
