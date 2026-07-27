@@ -1,0 +1,33 @@
+configuration:
+  feeds:
+    name: Feeds
+    description: List of feeds to create motion detection sensors from
+    fields:
+      name:
+        name: Name
+        description: Name of the feed
+      sourceUrl:
+        name: Source URL
+        description: Full url, including protocol and any query strings, it is recommended to use a lower-res and framerate stream to reduce resource use.
+      hassEntityId:
+        name: HomeAssistant Entity ID
+        description: Entity ID to use with the sensor
+      hassFriendlyName:
+        name: HomeAssistant Friendly Name
+        description: Friendly name to use with the sensor
+      sourceUsername:
+        name: Source Username
+        description: Username if credentials are required for the feed
+      sourcePassword:
+        name: Source Password
+        description: Password if credentials are required for the feed
+      sourceToken:
+        name: Source Token
+        description: Token if credentials are required for the feed (generally not used with username and password specified)
+      detectionDebounce:
+        name: Detection Debounce (seconds)
+        description: Seconds to wait before processing a state change in the motion
+      detectionSize:
+        name: Detection Size (pixels)
+        description: Minimum size of pixels in detected motion "blob" to trigger the sensor
+

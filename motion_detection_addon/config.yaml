@@ -1,6 +1,6 @@
 name: "Motion Detection Add-On"
 description: "Add motion detection sensors to RTSP feeds"
-version: "0.7.2"
+version: "0.7.3"
 slug: "motion_detection_addon"
 init: false
 arch:
@@ -18,9 +18,9 @@ options:
 
 schema:
   feeds:
-  - name: str?
-    sourceUrl: url?
-    hassEntityId: str?
+  - name: str
+    sourceUrl: url
+    hassEntityId: str
     hassFriendlyName: str?
     sourceUsername: str?
     sourcePassword: password?   #pragma: allowlist secret
