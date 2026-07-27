@@ -1,0 +1,17 @@
+name: Code Quality (prek)
+
+on:
+    push:
+        branches: [main, master]
+    pull_request:
+        branches: [main, master]
+
+jobs:
+    prek:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Run prek hooks
+              uses: j178/prek-action@v2
